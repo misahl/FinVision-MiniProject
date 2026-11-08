@@ -1,0 +1,18 @@
+{
+  "weights": {
+    "rule_failure_critical": 35,
+    "rule_failure_warning": 15,
+    "duplicate_exact_match": 40,
+    "duplicate_near_match": 25,
+    "cv_ela_anomaly": 15,
+    "cv_noise_inconsistency": 15,
+    "cv_text_spacing_outlier": 15,
+    "ml_high_probability": 20
+  },
+  "thresholds": {
+    "high_risk_min": 60,
+    "medium_risk_min": 25
+  },
+  "precedence": "rules_precedence_high"
+}
+

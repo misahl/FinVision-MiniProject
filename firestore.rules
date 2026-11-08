@@ -1,0 +1,388 @@
+rules_version = '2';
+
+// ===============================================================
+// FinVision Cloud Firestore Security Rules
+// ===============================================================
+//
+// Assumed Data Model:
+//
+// 1. Collection: users
+//    Document ID: {uid} (matches Firebase Auth UID)
+//    Fields:
+//      - displayName: string (required, 1-100 characters)
+//      - email: string (required, 1-100 characters, valid email format)
+//      - role: string (required, 'analyst' or 'admin')
+//      - createdAt: timestamp (optional, immutable)
+//      - updatedAt: timestamp (optional)
+//
+// 2. Collection: documents
+//    Document ID: {docId}
+//    Fields:
+//      - ownerUid: string (required, immutable, UID of document creator)
+//      - status: string (required, one of: 'uploaded', 'processing', 'analyzed',
+//                'reviewed', 'flagged', 'approved', 'rejected', 'archived')
+//      - fileName / filename: string (optional, 1-255 characters)
+//      - fileUrl / storagePath: string (optional, URI/storage path string)
+//      - fileSize: number (optional, >= 0)
+//      - contentType / mimeType: string (optional, <= 100 characters)
+//      - vendor / vendorName: string (optional, <= 200 characters)
+//      - invoiceNumber: string (optional, <= 100 characters)
+//      - invoiceDate: timestamp or string (optional)
+//      - totalAmount / amount: number (optional, >= 0)
+//      - currency: string (optional, <= 10 characters)
+//      - notes: string (optional, <= 2000 characters)
+//      - lineItemsCount: number (optional, >= 0)
+//      - risk: map (optional, populated by pipeline; forbidden on create)
+//      - ml: map (optional, populated by ML server; forbidden on create)
+//      - review: map (optional, populated by admin reviewer; forbidden on create)
+//      - metadata: map (optional)
+//      - createdAt: timestamp (optional, immutable)
+//      - updatedAt: timestamp (optional)
+//
+// 3. Subcollection: documents/{docId}/lineItems
+//    Document ID: {itemId}
+//    Fields:
+//      - description: string (optional, <= 500 characters)
+//      - quantity: number (optional, >= 0)
+//      - unitPrice: number (optional, >= 0)
+//      - totalAmount / amount: number (optional, >= 0)
+//      - taxRate / tax: number (optional)
+//      - category / itemCode: string (optional, <= 100 characters)
+//      - lineIndex: number (optional, >= 0)
+//      - ownerUid: string (optional, matches creator UID)
+//      - docId: string (optional, matches parent document ID)
+//      - createdAt: timestamp (optional, immutable)
+//      - updatedAt: timestamp (optional)
+//
+// 4. Collection: auditLog
+//    Document ID: {eventId}
+//    Fields:
+//      - actorUid: string (required, UID of the authenticated user performing action)
+//      - action: string (optional, <= 100 characters)
+//      - timestamp / createdAt: timestamp (optional)
+//      - docId / targetId: string (optional, <= 128 characters)
+//      - targetType: string (optional, <= 50 characters)
+//      - details: map (optional)
+//      - ipAddress: string (optional, <= 50 characters)
+//      - userAgent: string (optional, <= 300 characters)
+//
+// 5. Collection: modelRegistry
+//    Document ID: {version}
+//    Fields:
+//      - version: string
+//      - name: string
+//      - metrics: map
+//      - artifacts: map
+//      - createdAt: timestamp
+//      - active: bool
+//
+// ===============================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Global Default Deny
+    // ===============================================================
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // ===============================================================
+    // Core Helper Functions
+    // ===============================================================
+
+    // Check if the request is from an authenticated user
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Check if the authenticated user matches the specified UID
+    function isOwner(uid) {
+      return isAuthenticated() && request.auth.uid == uid;
+    }
+
+    // Check if the authenticated user has an 'admin' role in custom token claims
+    function isAdmin() {
+      return isAuthenticated() &&
+             ('role' in request.auth.token) &&
+             request.auth.token.role == 'admin';
+    }
+
+    // Validate that the resource contains all required fields
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    // Validate that the resource does not contain unexpected / extraneous fields
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    // Verify that specified immutable fields are not changed during an update
+    function areImmutableFieldsUnchanged(fields) {
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny(fields);
+    }
+
+    // Validate email format
+    function isValidEmail(email) {
+      return email is string &&
+             email.matches('^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$');
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    // User Profile Validator
+    function isValidUser(data) {
+      return hasOnlyAllowedFields(['displayName', 'email', 'role', 'createdAt', 'updatedAt']) &&
+             hasRequiredFields(['displayName', 'email', 'role']) &&
+             data.displayName is string &&
+             data.displayName.size() >= 1 &&
+             data.displayName.size() <= 100 &&
+             data.email is string &&
+             data.email.size() <= 100 &&
+             isValidEmail(data.email) &&
+             data.role is string &&
+             data.role in ['analyst', 'admin'] &&
+             (!('createdAt' in data) || data.createdAt is timestamp) &&
+             (!('updatedAt' in data) || data.updatedAt is timestamp);
+    }
+
+    // Document Status Values Validator
+    function isValidStatus(status) {
+      return status is string && status in [
+        'uploaded',
+        'processing',
+        'analyzed',
+        'reviewed',
+        'flagged',
+        'approved',
+        'rejected',
+        'archived'
+      ];
+    }
+
+    // Document Lifecycle State Transitions
+    function isValidStatusTransition() {
+      let oldStatus = resource.data.status;
+      let newStatus = request.resource.data.status;
+      return oldStatus == newStatus ||
+             (oldStatus == 'uploaded' && newStatus in ['processing', 'analyzed', 'flagged', 'archived']) ||
+             (oldStatus == 'processing' && newStatus in ['analyzed', 'flagged', 'uploaded', 'archived']) ||
+             (oldStatus == 'analyzed' && newStatus in ['reviewed', 'approved', 'rejected', 'flagged', 'archived']) ||
+             (oldStatus == 'flagged' && newStatus in ['reviewed', 'approved', 'rejected', 'archived']) ||
+             (oldStatus == 'reviewed' && newStatus in ['approved', 'rejected', 'archived']) ||
+             (oldStatus == 'approved' && newStatus in ['archived', 'reviewed']) ||
+             (oldStatus == 'rejected' && newStatus in ['archived', 'reviewed']) ||
+             isAdmin();
+    }
+
+    // Review Sub-Map Validator
+    function isValidReview(review) {
+      return review is map &&
+             review.keys().hasAll(['decision']) &&
+             review.keys().hasOnly(['decision', 'reviewerUid', 'reviewerName', 'notes', 'comment', 'reviewedAt']) &&
+             review.decision is string &&
+             review.decision in ['approved', 'rejected', 'escalated', 'flagged', 'pending'] &&
+             (!('reviewedAt' in review) || review.reviewedAt is timestamp) &&
+             (!('reviewerUid' in review) || (review.reviewerUid is string && review.reviewerUid.size() <= 128)) &&
+             (!('reviewerName' in review) || (review.reviewerName is string && review.reviewerName.size() <= 100)) &&
+             (!('notes' in review) || (review.notes is string && review.notes.size() <= 2000)) &&
+             (!('comment' in review) || (review.comment is string && review.comment.size() <= 2000));
+    }
+
+    // Document Pipeline Integrity Validator
+    // Non-admin users cannot add or alter pipeline-generated risk, ml, or review.
+    // Admin users can submit reviews.
+    function isProtectedPipelineDataPreserved() {
+      let affected = request.resource.data.diff(resource.data).affectedKeys();
+      return isAdmin()
+        ? (!affected.hasAny(['review']) || isValidReview(request.resource.data.review))
+        : !affected.hasAny(['risk', 'ml', 'review']);
+    }
+
+    // Document Schema Validator
+    function isValidDocument(data) {
+      return hasOnlyAllowedFields([
+        'ownerUid', 'status', 'createdAt', 'updatedAt',
+        'fileName', 'filename', 'fileUrl', 'fileSize', 'contentType', 'mimeType', 'storagePath',
+        'vendor', 'vendorName', 'invoiceNumber', 'invoiceDate',
+        'totalAmount', 'amount', 'currency', 'notes', 'lineItemsCount',
+        'risk', 'ml', 'review', 'metadata'
+      ]) &&
+      hasRequiredFields(['ownerUid', 'status']) &&
+      data.ownerUid is string &&
+      data.ownerUid.size() <= 128 &&
+      data.status is string &&
+      isValidStatus(data.status) &&
+      (!('createdAt' in data) || data.createdAt is timestamp) &&
+      (!('updatedAt' in data) || data.updatedAt is timestamp) &&
+      (!('fileName' in data) || (data.fileName is string && data.fileName.size() <= 255)) &&
+      (!('filename' in data) || (data.filename is string && data.filename.size() <= 255)) &&
+      (!('fileUrl' in data) || (data.fileUrl is string && data.fileUrl.size() <= 1000)) &&
+      (!('fileSize' in data) || (data.fileSize is number && data.fileSize >= 0)) &&
+      (!('contentType' in data) || (data.contentType is string && data.contentType.size() <= 100)) &&
+      (!('mimeType' in data) || (data.mimeType is string && data.mimeType.size() <= 100)) &&
+      (!('storagePath' in data) || (data.storagePath is string && data.storagePath.size() <= 500)) &&
+      (!('vendor' in data) || (data.vendor is string && data.vendor.size() <= 200)) &&
+      (!('vendorName' in data) || (data.vendorName is string && data.vendorName.size() <= 200)) &&
+      (!('invoiceNumber' in data) || (data.invoiceNumber is string && data.invoiceNumber.size() <= 100)) &&
+      (!('invoiceDate' in data) || data.invoiceDate is timestamp || (data.invoiceDate is string && data.invoiceDate.size() <= 100)) &&
+      (!('totalAmount' in data) || (data.totalAmount is number && data.totalAmount >= 0)) &&
+      (!('amount' in data) || (data.amount is number && data.amount >= 0)) &&
+      (!('currency' in data) || (data.currency is string && data.currency.size() <= 10)) &&
+      (!('notes' in data) || (data.notes is string && data.notes.size() <= 2000)) &&
+      (!('lineItemsCount' in data) || (data.lineItemsCount is number && data.lineItemsCount >= 0)) &&
+      (!('risk' in data) || data.risk is map) &&
+      (!('ml' in data) || data.ml is map) &&
+      (!('review' in data) || isValidReview(data.review)) &&
+      (!('metadata' in data) || data.metadata is map);
+    }
+
+    // Line Item Schema Validator
+    function isValidLineItem(data) {
+      return hasOnlyAllowedFields([
+        'description', 'quantity', 'unitPrice', 'totalAmount', 'amount',
+        'taxRate', 'tax', 'category', 'itemCode', 'lineIndex',
+        'ownerUid', 'docId', 'createdAt', 'updatedAt'
+      ]) &&
+      (!('description' in data) || (data.description is string && data.description.size() <= 500)) &&
+      (!('quantity' in data) || (data.quantity is number && data.quantity >= 0)) &&
+      (!('unitPrice' in data) || (data.unitPrice is number && data.unitPrice >= 0)) &&
+      (!('totalAmount' in data) || (data.totalAmount is number && data.totalAmount >= 0)) &&
+      (!('amount' in data) || (data.amount is number && data.amount >= 0)) &&
+      (!('taxRate' in data) || data.taxRate is number) &&
+      (!('tax' in data) || data.tax is number) &&
+      (!('category' in data) || (data.category is string && data.category.size() <= 100)) &&
+      (!('itemCode' in data) || (data.itemCode is string && data.itemCode.size() <= 100)) &&
+      (!('lineIndex' in data) || (data.lineIndex is number && data.lineIndex >= 0)) &&
+      (!('ownerUid' in data) || (data.ownerUid is string && data.ownerUid == request.auth.uid)) &&
+      (!('docId' in data) || (data.docId is string && data.docId.size() <= 128)) &&
+      (!('createdAt' in data) || data.createdAt is timestamp) &&
+      (!('updatedAt' in data) || data.updatedAt is timestamp);
+    }
+
+    // Audit Log Schema Validator
+    function isValidAuditLog(data) {
+      return hasOnlyAllowedFields([
+        'actorUid', 'action', 'timestamp', 'docId', 'targetId',
+        'targetType', 'details', 'ipAddress', 'userAgent', 'createdAt'
+      ]) &&
+      hasRequiredFields(['actorUid']) &&
+      data.actorUid is string &&
+      data.actorUid.size() <= 128 &&
+      (!('action' in data) || (data.action is string && data.action.size() <= 100)) &&
+      (!('timestamp' in data) || data.timestamp is timestamp) &&
+      (!('createdAt' in data) || data.createdAt is timestamp) &&
+      (!('docId' in data) || (data.docId is string && data.docId.size() <= 128)) &&
+      (!('targetId' in data) || (data.targetId is string && data.targetId.size() <= 128)) &&
+      (!('targetType' in data) || (data.targetType is string && data.targetType.size() <= 50)) &&
+      (!('ipAddress' in data) || (data.ipAddress is string && data.ipAddress.size() <= 50)) &&
+      (!('userAgent' in data) || (data.userAgent is string && data.userAgent.size() <= 300)) &&
+      (!('details' in data) || data.details is map);
+    }
+
+    // ===============================================================
+    // Collection Rules
+    // ===============================================================
+
+    // 1. Users Collection
+    match /users/{uid} {
+      // Read: Profile owner or admin
+      allow read: if isOwner(uid) || isAdmin();
+
+      // Create: Owner can initialize profile with 'analyst' role.
+      // Admin can initialize profiles with 'analyst' or 'admin' role.
+      allow create: if (isOwner(uid) || isAdmin()) &&
+                       isValidUser(request.resource.data) &&
+                       (request.resource.data.role == 'analyst' || isAdmin());
+
+      // Update: Owner can update own profile, but cannot self-escalate role.
+      // Admin can update any user profile and modify roles.
+      allow update: if (isOwner(uid) || isAdmin()) &&
+                       isValidUser(request.resource.data) &&
+                       areImmutableFieldsUnchanged(['createdAt']) &&
+                       (request.resource.data.role == resource.data.role || isAdmin());
+
+      // Delete: Strictly prohibited
+      allow delete: if false;
+    }
+
+    // 2. Documents Collection & LineItems Subcollection
+    match /documents/{docId} {
+      // Read: Document owner or admin
+      allow read: if isAuthenticated() &&
+                     (('ownerUid' in resource.data && resource.data.ownerUid == request.auth.uid) || isAdmin());
+
+      // Create: Authenticated creator with initial 'uploaded' status and no forged analysis/review
+      allow create: if isAuthenticated() &&
+                       request.resource.data.ownerUid == request.auth.uid &&
+                       request.resource.data.status == 'uploaded' &&
+                       !('risk' in request.resource.data) &&
+                       !('ml' in request.resource.data) &&
+                       !('review' in request.resource.data) &&
+                       isValidDocument(request.resource.data);
+
+      // Update: Document owner or admin
+      // Owner cannot alter risk, ml, or review; admin can update review.
+      // Transitions and schema are strictly verified.
+      allow update: if isAuthenticated() &&
+                       (('ownerUid' in resource.data && resource.data.ownerUid == request.auth.uid) || isAdmin()) &&
+                       request.resource.data.ownerUid == resource.data.ownerUid &&
+                       areImmutableFieldsUnchanged(['ownerUid', 'createdAt']) &&
+                       isValidStatusTransition() &&
+                       isProtectedPipelineDataPreserved() &&
+                       isValidDocument(request.resource.data);
+
+      // Delete: Admins only
+      allow delete: if isAdmin();
+
+      // LineItems Subcollection
+      match /lineItems/{itemId} {
+        // Helper to check parent document ownership
+        function isParentOwner() {
+          let parentDoc = get(/databases/$(database)/documents/documents/$(docId));
+          return parentDoc != null &&
+                 'ownerUid' in parentDoc.data &&
+                 parentDoc.data.ownerUid == request.auth.uid;
+        }
+
+        // Access allowed if admin or user owns parent document
+        function canAccessLineItem() {
+          return isAuthenticated() && (isAdmin() || isParentOwner());
+        }
+
+        allow read: if canAccessLineItem();
+        allow create: if canAccessLineItem() && isValidLineItem(request.resource.data);
+        allow update: if canAccessLineItem() && isValidLineItem(request.resource.data);
+        allow delete: if canAccessLineItem();
+      }
+    }
+
+    // 3. AuditLog Collection
+    match /auditLog/{eventId} {
+      // Read: Users can read their own audit entries; admins can read all entries
+      allow read: if isAuthenticated() &&
+                     (('actorUid' in resource.data && resource.data.actorUid == request.auth.uid) || isAdmin());
+
+      // Create: Append-only by authenticated actor matching actorUid
+      allow create: if isAuthenticated() &&
+                       request.resource.data.actorUid == request.auth.uid &&
+                       isValidAuditLog(request.resource.data);
+
+      // Update and delete are forbidden
+      allow update, delete: if false;
+    }
+
+    // 4. ModelRegistry Collection
+    match /modelRegistry/{version} {
+      // Read: Authenticated users can inspect model versions
+      allow read: if isAuthenticated();
+
+      // Write: Disabled for client SDKs (written only via Admin SDK / Server)
+      allow write: if false;
+    }
+  }
+}

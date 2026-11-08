@@ -1,0 +1,10 @@
+{
+  "currency_default": "USD",
+  "math_tolerance_cents": 0.02,
+  "default_tax_rate": 0.10,
+  "min_historical_docs_for_outliers": 5,
+  "outlier_zscore_threshold": 2.5,
+  "max_invoice_age_years": 20,
+  "phash_hamming_threshold": 5
+}
+

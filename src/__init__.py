@@ -1,0 +1,2 @@
+"""FinVision pure domain package."""
+

@@ -1,0 +1,21 @@
+# FinVision exact pinned requirements for Python 3.12
+streamlit==1.66.1
+plotly==7.1.0
+opencv-python-headless==5.0.0.93
+pytesseract==0.3.13
+pillow==13.0.0
+pandas==3.1.0
+numpy==2.5.4
+scikit-learn==1.9.1
+joblib==1.6.0
+imagehash==4.3.2
+pymupdf==2.1
+firebase-admin==7.7.0
+python-dotenv==1.2.4
+reportlab==5.1.0
+pytest==9.2.0
+requests==2.34.2
+scipy==1.18.1
+pyarrow==26.0.1
+altair==6.3.0
+

@@ -1,0 +1,33 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    
+    // Default deny
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+
+    // Invoice files: users/{uid}/invoices/{docId}/{filename}
+    match /users/{uid}/invoices/{docId}/{filename} {
+      allow read: if request.auth != null && (request.auth.uid == uid || request.auth.token.role == 'admin');
+      allow write: if request.auth != null && request.auth.uid == uid
+                    && request.resource.size < 10 * 1024 * 1024
+                    && request.resource.contentType.matches('image/(jpeg|png)|application/pdf');
+    }
+
+    // Generated reports: users/{uid}/reports/{docId}/{filename}
+    match /users/{uid}/reports/{docId}/{filename} {
+      allow read: if request.auth != null && (request.auth.uid == uid || request.auth.token.role == 'admin');
+      allow write: if request.auth != null && request.auth.uid == uid
+                    && request.resource.size < 15 * 1024 * 1024
+                    && request.resource.contentType == 'application/pdf';
+    }
+
+    // Model artifacts: read-only for authenticated users
+    match /models/{filename} {
+      allow read: if request.auth != null;
+      allow write: if false; // Server/Admin SDK only
+    }
+  }
+}
+

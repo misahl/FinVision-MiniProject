@@ -1,0 +1,2 @@
+"""FinVision frontend package."""
+

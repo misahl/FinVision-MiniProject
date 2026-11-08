@@ -1,0 +1,44 @@
+# Environments
+.venv/
+env/
+venv/
+ENV/
+
+# Secrets and credentials
+.env
+*.env
+serviceAccount*.json
+*service-account*.json
+firebase-credentials.json
+
+# Python cache & artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+.coverage
+htmlcov/
+
+# FinVision uploads and local models
+uploads/
+models/*.joblib
+!models/.gitkeep
+
+# Raw image dataset (2.3GB - kept local, documented via manifest.csv)
+Dataset/high-quality-invoice-images/
+Dataset/**/*.jpg
+Dataset/**/*.jpeg
+Dataset/**/*.png
+Dataset/**/*.pdf
+!Dataset/SYNTHETIC_METHOD.md
+!Dataset/manifest.csv
+
+# Firebase & OS caches
+.firebase/
+firebase-debug.log*
+firestore-debug.log*
+ui-debug.log*
+.DS_Store
+Thumbs.db
+

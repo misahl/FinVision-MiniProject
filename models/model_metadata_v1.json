@@ -1,0 +1,62 @@
+{
+  "version": "v1.0.0",
+  "trainedAt": "2026-11-05T06:00:00Z",
+  "datasetDescription": "600 balanced normal and synthetically perturbed invoice records",
+  "syntheticMethod": "See dataset/SYNTHETIC_METHOD.md for perturbation specifications",
+  "trainTestSplit": "GroupShuffleSplit (grouped by source_invoice_id, 75% train / 25% test, 0 leakage)",
+  "trainSamples": 450,
+  "testSamples": 150,
+  "features": [
+    "total_mismatch",
+    "subtotal_mismatch",
+    "tax_mismatch",
+    "missing_fields",
+    "duplicate_flag",
+    "ocr_confidence",
+    "image_anomaly_score"
+  ],
+  "featureImportances": {
+    "total_mismatch": 0.2441,
+    "subtotal_mismatch": 0.0087,
+    "tax_mismatch": 0.1019,
+    "missing_fields": 0.1671,
+    "duplicate_flag": 0.1239,
+    "ocr_confidence": 0.2848,
+    "image_anomaly_score": 0.0695
+  },
+  "metrics": {
+    "mlModel": {
+      "accuracy": 1.0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1Score": 1.0,
+      "confusionMatrix": [
+        [
+          75,
+          0
+        ],
+        [
+          0,
+          75
+        ]
+      ]
+    },
+    "ruleBasedBaseline": {
+      "accuracy": 0.5467,
+      "precision": 0.5248,
+      "recall": 0.9867,
+      "f1Score": 0.6852,
+      "confusionMatrix": [
+        [
+          8,
+          67
+        ],
+        [
+          1,
+          74
+        ]
+      ]
+    }
+  },
+  "disclaimer": "Model trained strictly on reproducible synthetic perturbations. Synthetic test performance does not guarantee real-world fraud detection efficacy."
+}
