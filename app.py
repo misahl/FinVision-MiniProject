@@ -91,20 +91,29 @@ def render_auth_screen():
             # Quick 1-Click Demo Login
             st.markdown("<div style='text-align: center; margin-top: 10px;'>", unsafe_allow_html=True)
             if st.button("⚡ Quick Demo Analyst Sign-In", use_container_width=True):
-                auth_res = firebase_service.sign_up_user(
-                    email="demo_analyst@finvision.test",
-                    password="DemoPassword123!",
-                    display_name="Demo Financial Analyst",
-                    role="analyst",
-                )
-                st.session_state["user"] = {
-                    "uid": auth_res["localId"],
-                    "email": auth_res["email"],
-                    "displayName": auth_res.get("displayName", "Demo Analyst"),
-                    "role": "analyst",
-                }
-                st.session_state["id_token"] = auth_res["idToken"]
-                st.rerun()
+                try:
+                    try:
+                        auth_res = firebase_service.sign_in_user(
+                            email="demo_analyst@finvision.test",
+                            password="DemoPassword123!",
+                        )
+                    except Exception:
+                        auth_res = firebase_service.sign_up_user(
+                            email="demo_analyst@finvision.test",
+                            password="DemoPassword123!",
+                            display_name="Demo Financial Analyst",
+                            role="analyst",
+                        )
+                    st.session_state["user"] = {
+                        "uid": auth_res["localId"],
+                        "email": auth_res["email"],
+                        "displayName": auth_res.get("displayName", "Demo Analyst"),
+                        "role": auth_res.get("role", "analyst"),
+                    }
+                    st.session_state["id_token"] = auth_res["idToken"]
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Demo sign-in error: {str(e)}")
             st.markdown("</div>", unsafe_allow_html=True)
 
         with tab_register:
