@@ -42,3 +42,7 @@ ui-debug.log*
 .DS_Store
 Thumbs.db
 
+# Other college scripts
+automata_solver/
+run_automata.bat
+
