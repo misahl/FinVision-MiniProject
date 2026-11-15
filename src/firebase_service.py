@@ -25,10 +25,11 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Firebase Environment Variables
-USE_EMULATOR = os.getenv("FIREBASE_USE_EMULATOR", "true").lower() in ("true", "1", "yes")
+USE_EMULATOR = os.getenv("FIREBASE_USE_EMULATOR", "false").lower() in ("true", "1", "yes")
+REQUIRE_FIREBASE = os.getenv("FINVISION_REQUIRE_FIREBASE", "false").lower() in ("true", "1", "yes")
 PROJECT_ID = os.getenv("FIREBASE_PROJECT_ID", "finvision-dev")
 STORAGE_BUCKET = os.getenv("FIREBASE_STORAGE_BUCKET", f"{PROJECT_ID}.appspot.com")
-API_KEY = os.getenv("FIREBASE_API_KEY", "fake-api-key-for-emulator")
+API_KEY = os.getenv("FIREBASE_API_KEY", "")
 
 AUTH_EMU_HOST = os.getenv("FIREBASE_AUTH_EMULATOR_HOST", "127.0.0.1:9099")
 FIRESTORE_EMU_HOST = os.getenv("FIRESTORE_EMULATOR_HOST", "127.0.0.1:8080")
@@ -104,8 +105,13 @@ def initialize_firebase():
                     _EMULATOR_REACHABLE = False
             else:
                 _EMULATOR_REACHABLE = True
-        except Exception:
+        except Exception as exc:
             _EMULATOR_REACHABLE = False
+            if REQUIRE_FIREBASE:
+                raise RuntimeError(
+                    "Firebase initialization failed. Check Firebase credentials, project ID, "
+                    "storage bucket, and network access."
+                ) from exc
 
 
 # Initial attempt to hook into Firebase Admin
@@ -124,6 +130,8 @@ def sign_up_user(
 ) -> Dict[str, Any]:
     """Register a new user using Firebase Identity Toolkit REST API."""
     if USE_EMULATOR and not _EMULATOR_REACHABLE:
+        if REQUIRE_FIREBASE:
+            raise RuntimeError("Firebase Emulator is unavailable; local fallback is disabled.")
         # Offline in-memory fallback
         uid = f"user_{uuid.uuid4().hex[:12]}"
         user_record = {
@@ -180,6 +188,8 @@ def sign_up_user(
 def sign_in_user(email: str, password: str) -> Dict[str, Any]:
     """Authenticate user with email and password via Identity Toolkit REST API."""
     if USE_EMULATOR and not _EMULATOR_REACHABLE:
+        if REQUIRE_FIREBASE:
+            raise RuntimeError("Firebase Emulator is unavailable; local fallback is disabled.")
         # Offline in-memory search
         for uid, u in _LOCAL_STORE.users.items():
             if u["email"].lower() == email.lower():
@@ -191,8 +201,7 @@ def sign_in_user(email: str, password: str) -> Dict[str, Any]:
                     "displayName": u.get("displayName", "Analyst"),
                     "role": u.get("role", "analyst"),
                 }
-        # If not found in mock store, create temporary session for convenience
-        return sign_up_user(email, password, display_name="Test Analyst", role="analyst")
+        raise ValueError("Invalid email or password. Temporary sessions are disabled.")
 
     if USE_EMULATOR:
         url = f"http://{AUTH_EMU_HOST}/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key={API_KEY}"
@@ -221,6 +230,8 @@ def sign_in_user(email: str, password: str) -> Dict[str, Any]:
 def verify_user_token(id_token: str) -> Dict[str, Any]:
     """Verify Firebase ID token and return claims dict with user identity."""
     if id_token.startswith("mock-token-"):
+        if REQUIRE_FIREBASE:
+            raise PermissionError("Mock authentication is disabled in production.")
         uid = id_token.replace("mock-token-", "")
         user = _LOCAL_STORE.users.get(uid, {"uid": uid, "email": "analyst@finvision.local", "role": "analyst"})
         return {"uid": uid, "email": user.get("email"), "role": user.get("role", "analyst")}

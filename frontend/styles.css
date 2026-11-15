@@ -326,3 +326,36 @@ div[data-testid="stDataFrame"] {
     border-radius: 10px !important;
     overflow: hidden !important;
 }
+
+
+/* FinVision workspace refinement */
+.fv-eyebrow{font-size:.72rem;font-weight:800;letter-spacing:.13em;color:#5E7692;margin:0 0 .55rem}
+.fv-header{display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;margin-bottom:1.25rem}
+.fv-header h1{font-size:2.15rem!important;letter-spacing:-.045em!important;margin:0!important}
+.fv-header p{font-size:1rem;color:#64748B;margin:.45rem 0 0}
+.fv-live{display:inline-flex;align-items:center;gap:.5rem;border:1px solid #DDE7F0;background:#fff;border-radius:999px;padding:.45rem .8rem;color:#42566D;font-size:.78rem;font-weight:700;white-space:nowrap}
+.fv-live span{width:7px;height:7px;background:#16A477;border-radius:50%;display:inline-block}
+.fv-banner{background:linear-gradient(110deg,#10243C,#1E3E60);border-radius:14px;padding:1.2rem 1.4rem;margin:.5rem 0 1.35rem;color:#fff;box-shadow:0 8px 24px rgba(16,36,60,.10)}
+.fv-banner strong{font-size:1.02rem;color:#fff}
+.fv-banner p{color:#D4E0EC!important;margin:.35rem 0 0;font-size:.88rem}
+.fv-section-head{display:flex;justify-content:space-between;align-items:flex-end;margin:1.65rem 0 .65rem}
+.fv-section-head h2{margin:0!important;font-size:1.28rem!important}
+.fv-section-head p{margin:.2rem 0 0;color:#78899A;font-size:.82rem}
+.fv-empty{min-height:245px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;background:#fff;border:1px dashed #C9D6E3;border-radius:14px;padding:1.5rem}
+.fv-empty-icon{height:44px;width:44px;display:grid;place-items:center;border-radius:13px;background:#EEF4FA;color:#315B83;font-size:1.5rem;margin-bottom:.75rem}
+.fv-empty strong{color:#20354B;font-size:.98rem}
+.fv-empty p{max-width:310px;color:#718298!important;font-size:.84rem;margin:.35rem 0 0}
+.fin-card{border:1px solid #E4EAF1!important;border-radius:14px!important;padding:17px 17px!important;min-height:120px;box-shadow:0 3px 12px rgba(20,42,68,.035)!important}
+.fin-card-title{font-size:.68rem!important;letter-spacing:.075em!important;color:#718198!important}
+.fin-card-value{font-size:1.8rem!important;font-weight:750!important;letter-spacing:-.04em}
+.fin-card-subtitle{font-size:.76rem!important;color:#8391A3!important}
+section[data-testid="stSidebar"]{border-right:1px solid #E0E8F0!important}
+section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] h2{letter-spacing:-.03em}
+div[data-testid="stDataFrame"]{border-radius:12px!important}
+@media(max-width:800px){
+ .fv-header{flex-direction:column}
+ .fv-header h1{font-size:1.65rem!important}
+ .fv-banner{padding:1rem}
+ .fin-card{min-height:108px;padding:13px!important}
+ .fin-card-value{font-size:1.5rem!important}
+}
