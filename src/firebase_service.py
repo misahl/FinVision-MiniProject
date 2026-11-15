@@ -42,7 +42,7 @@ def _setting(name: str, default: Optional[str] = None) -> Optional[str]:
 USE_EMULATOR = (_setting("FIREBASE_USE_EMULATOR", "false") or "false").lower() in ("true", "1", "yes")
 PROJECT_ID = _setting("FIREBASE_PROJECT_ID", "finvision-dev") or "finvision-dev"
 STORAGE_BUCKET = _setting("FIREBASE_STORAGE_BUCKET", f"{PROJECT_ID}.appspot.com") or f"{PROJECT_ID}.appspot.com"
-API_KEY = _setting("FIREBASE_API_KEY", "") or ""
+API_KEY = _setting("FIREBASE_API_KEY", "emulator-api-key" if USE_EMULATOR else "") or ""
 SERVICE_ACCOUNT_JSON = _setting("FIREBASE_SERVICE_ACCOUNT_JSON", "") or ""
 
 AUTH_EMU_HOST = os.getenv("FIREBASE_AUTH_EMULATOR_HOST", "127.0.0.1:9099")
