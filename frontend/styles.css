@@ -326,3 +326,33 @@ div[data-testid="stDataFrame"] {
     border-radius: 10px !important;
     overflow: hidden !important;
 }
+
+
+/* FinVision enterprise polish and responsive behaviour */
+.fv-page-heading { margin: 0 0 1.35rem; }
+.fv-eyebrow, .fv-welcome-kicker { color: #64748B; font-size: .72rem; font-weight: 750; letter-spacing: .12em; }
+.fv-page-heading h1 { font-size: clamp(1.65rem, 3vw, 2.15rem) !important; margin: .35rem 0 .3rem !important; }
+.fv-page-heading p { color: #667085 !important; margin: 0 !important; font-size: .96rem; }
+.fv-welcome { display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:1.25rem 1.4rem; margin:.8rem 0 1.6rem; border:1px solid #DCE5F0; border-radius:14px; background:linear-gradient(110deg,#FFFFFF 0%,#F2F7FC 100%); box-shadow:0 2px 8px rgba(16,36,64,.035); }
+.fv-welcome-title { color:#14243A; font-size:1.18rem; font-weight:750; margin:.28rem 0; }
+.fv-welcome-copy { color:#667085; font-size:.88rem; }
+.fv-welcome-meta { white-space:nowrap; color:#475467; font-size:.78rem; font-weight:650; }
+.fv-live-dot { display:inline-block; width:8px; height:8px; margin-right:7px; border-radius:50%; background:#16A37A; box-shadow:0 0 0 3px #DDF5EC; }
+.fv-empty-panel { min-height:220px; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:1.5rem; border:1px dashed #CBD5E1; border-radius:12px; background:#FBFCFE; }
+.fv-empty-icon { display:grid; place-items:center; width:42px; height:42px; margin-bottom:.75rem; border-radius:12px; background:#EAF1FA; color:#315B91; font-size:1.5rem; }
+.fv-empty-panel strong, .fv-first-run strong { color:#1D2939; font-size:.95rem; }
+.fv-empty-panel p, .fv-first-run p { color:#667085 !important; font-size:.84rem; margin:.35rem 0 0 !important; }
+.fv-first-run { display:flex; align-items:center; gap:1rem; padding:1.15rem 1.25rem; border:1px solid #DCE5F0; border-radius:12px; background:#FFFFFF; }
+.fv-first-run-mark { display:grid; flex:0 0 42px; place-items:center; width:42px; height:42px; border-radius:12px; background:#EAF1FA; color:#315B91; font-size:1.5rem; }
+@media (max-width: 900px) {
+  .fv-welcome { align-items:flex-start; flex-direction:column; }
+  .fv-welcome-meta { white-space:normal; }
+}
+@media (max-width: 640px) {
+  section.main > div { padding-left: 1rem !important; padding-right: 1rem !important; }
+  .fv-page-heading h1 { font-size:1.55rem !important; }
+  .fv-welcome { padding:1rem; }
+  .fv-first-run { align-items:flex-start; }
+  div[data-testid="stMetric"] { padding:.65rem !important; }
+  div[data-testid="stDataFrame"] { overflow-x:auto; }
+}
