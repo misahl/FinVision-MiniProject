@@ -24,11 +24,19 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+# Detect if running in Google Cloud Run production environment
+IS_CLOUD_RUN = bool(os.getenv("K_SERVICE"))
+
 # Firebase Environment Variables
-USE_EMULATOR = os.getenv("FIREBASE_USE_EMULATOR", "true").lower() in ("true", "1", "yes")
-PROJECT_ID = os.getenv("FIREBASE_PROJECT_ID", "finvision-dev")
-STORAGE_BUCKET = os.getenv("FIREBASE_STORAGE_BUCKET", f"{PROJECT_ID}.appspot.com")
-API_KEY = os.getenv("FIREBASE_API_KEY", "fake-api-key-for-emulator")
+if IS_CLOUD_RUN:
+    # Always disable emulator in Cloud Run production
+    USE_EMULATOR = False
+else:
+    USE_EMULATOR = os.getenv("FIREBASE_USE_EMULATOR", "false").lower() in ("true", "1", "yes")
+
+PROJECT_ID = os.getenv("FIREBASE_PROJECT_ID", "finvision-verify")
+STORAGE_BUCKET = os.getenv("FIREBASE_STORAGE_BUCKET", "finvision-verify.firebasestorage.app")
+API_KEY = os.getenv("FIREBASE_API_KEY", "AIzaSyDwczi-u9zaEor_vUiId1XAE3Z4Qi4hiEY")
 
 AUTH_EMU_HOST = os.getenv("FIREBASE_AUTH_EMULATOR_HOST", "127.0.0.1:9099")
 FIRESTORE_EMU_HOST = os.getenv("FIRESTORE_EMULATOR_HOST", "127.0.0.1:8080")
@@ -244,18 +252,28 @@ def create_user_profile(uid: str, display_name: str, email: str, role: str):
         "role": role,
         "createdAt": datetime.now(timezone.utc).isoformat(),
     }
-    if _EMULATOR_REACHABLE and _FIRESTORE_CLIENT:
-        _FIRESTORE_CLIENT.collection("users").document(uid).set(profile)
-    else:
-        _LOCAL_STORE.users[uid] = profile
+    if not USE_EMULATOR or (_EMULATOR_REACHABLE and _FIRESTORE_CLIENT):
+        if _FIRESTORE_CLIENT is None:
+            initialize_firebase()
+        if _FIRESTORE_CLIENT:
+            _FIRESTORE_CLIENT.collection("users").document(uid).set(profile)
+            return
+        elif not USE_EMULATOR:
+            raise RuntimeError("Cloud Firestore is unreachable in production.")
+    _LOCAL_STORE.users[uid] = profile
 
 
 def get_user_profile(uid: str) -> Dict[str, Any]:
     """Read user profile from Firestore."""
-    if _EMULATOR_REACHABLE and _FIRESTORE_CLIENT:
-        doc = _FIRESTORE_CLIENT.collection("users").document(uid).get()
-        if doc.exists:
-            return doc.to_dict()
+    if not USE_EMULATOR or (_EMULATOR_REACHABLE and _FIRESTORE_CLIENT):
+        if _FIRESTORE_CLIENT is None:
+            initialize_firebase()
+        if _FIRESTORE_CLIENT:
+            doc = _FIRESTORE_CLIENT.collection("users").document(uid).get()
+            if doc.exists:
+                return doc.to_dict()
+            elif not USE_EMULATOR:
+                return {"displayName": "Analyst", "role": "analyst"}
     return _LOCAL_STORE.users.get(uid, {"displayName": "Analyst", "role": "analyst"})
 
 
@@ -304,8 +322,13 @@ def create_document_record(
         "review": None,
     }
 
-    if _EMULATOR_REACHABLE and _FIRESTORE_CLIENT:
-        _FIRESTORE_CLIENT.collection("documents").document(doc_id).set(doc_data)
+    if not USE_EMULATOR or (_EMULATOR_REACHABLE and _FIRESTORE_CLIENT):
+        if _FIRESTORE_CLIENT is None:
+            initialize_firebase()
+        if _FIRESTORE_CLIENT:
+            _FIRESTORE_CLIENT.collection("documents").document(doc_id).set(doc_data)
+        elif not USE_EMULATOR:
+            raise RuntimeError("Cloud Firestore is unreachable in production.")
     else:
         _LOCAL_STORE.documents[doc_id] = doc_data
 
@@ -346,41 +369,52 @@ def save_document_analysis(
     if storage_path:
         update_payload["file.storagePath"] = storage_path
 
-    if _EMULATOR_REACHABLE and _FIRESTORE_CLIENT:
-        doc_ref = _FIRESTORE_CLIENT.collection("documents").document(doc_id)
-        doc_ref.update(update_payload)
-        
-        # Write line items to subcollection
-        for idx, item in enumerate(line_items):
-            item_id = f"item_{idx+1:03d}"
-            doc_ref.collection("lineItems").document(item_id).set(item)
+    if not USE_EMULATOR or (_EMULATOR_REACHABLE and _FIRESTORE_CLIENT):
+        if _FIRESTORE_CLIENT is None:
+            initialize_firebase()
+        if _FIRESTORE_CLIENT:
+            doc_ref = _FIRESTORE_CLIENT.collection("documents").document(doc_id)
+            doc_ref.update(update_payload)
+            
+            # Write line items to subcollection
+            for idx, item in enumerate(line_items):
+                item_id = f"item_{idx+1:03d}"
+                doc_ref.collection("lineItems").document(item_id).set(item)
+            return
+        elif not USE_EMULATOR:
+            raise RuntimeError("Cloud Firestore is unreachable in production.")
+
+    if doc_id in _LOCAL_STORE.documents:
+        _LOCAL_STORE.documents[doc_id].update(update_payload)
+        if storage_path:
+            _LOCAL_STORE.documents[doc_id].setdefault("file", {})["storagePath"] = storage_path
     else:
-        if doc_id in _LOCAL_STORE.documents:
-            _LOCAL_STORE.documents[doc_id].update(update_payload)
-            if storage_path:
-                _LOCAL_STORE.documents[doc_id].setdefault("file", {})["storagePath"] = storage_path
-        else:
-            doc_record = {"docId": doc_id, **update_payload}
-            if storage_path:
-                doc_record.setdefault("file", {})["storagePath"] = storage_path
-            _LOCAL_STORE.documents[doc_id] = doc_record
-        
-        _LOCAL_STORE.line_items[doc_id] = {
-            f"item_{idx+1:03d}": it for idx, it in enumerate(line_items)
-        }
+        doc_record = {"docId": doc_id, **update_payload}
+        if storage_path:
+            doc_record.setdefault("file", {})["storagePath"] = storage_path
+        _LOCAL_STORE.documents[doc_id] = doc_record
+    
+    _LOCAL_STORE.line_items[doc_id] = {
+        f"item_{idx+1:03d}": it for idx, it in enumerate(line_items)
+    }
 
 
 def get_document(doc_id: str) -> Optional[Dict[str, Any]]:
     """Fetch complete document including subcollection line items."""
-    if _EMULATOR_REACHABLE and _FIRESTORE_CLIENT:
-        doc = _FIRESTORE_CLIENT.collection("documents").document(doc_id).get()
-        if not doc.exists:
-            return None
-        data = doc.to_dict()
-        # Fetch subcollection line items
-        items_ref = _FIRESTORE_CLIENT.collection("documents").document(doc_id).collection("lineItems").stream()
-        data["lineItems"] = [item.to_dict() for item in items_ref]
-        return data
+    if not USE_EMULATOR or (_EMULATOR_REACHABLE and _FIRESTORE_CLIENT):
+        if _FIRESTORE_CLIENT is None:
+            initialize_firebase()
+        if _FIRESTORE_CLIENT:
+            doc = _FIRESTORE_CLIENT.collection("documents").document(doc_id).get()
+            if not doc.exists:
+                return None
+            data = doc.to_dict()
+            # Fetch subcollection line items
+            items_ref = _FIRESTORE_CLIENT.collection("documents").document(doc_id).collection("lineItems").stream()
+            data["lineItems"] = [item.to_dict() for item in items_ref]
+            return data
+        elif not USE_EMULATOR:
+            raise RuntimeError("Cloud Firestore is unreachable in production.")
 
     doc_data = _LOCAL_STORE.documents.get(doc_id)
     if doc_data:
@@ -410,8 +444,13 @@ def update_document_review_decision(
         "review": review_map,
     }
 
-    if _EMULATOR_REACHABLE and _FIRESTORE_CLIENT:
-        _FIRESTORE_CLIENT.collection("documents").document(doc_id).update(update_data)
+    if not USE_EMULATOR or (_EMULATOR_REACHABLE and _FIRESTORE_CLIENT):
+        if _FIRESTORE_CLIENT is None:
+            initialize_firebase()
+        if _FIRESTORE_CLIENT:
+            _FIRESTORE_CLIENT.collection("documents").document(doc_id).update(update_data)
+        elif not USE_EMULATOR:
+            raise RuntimeError("Cloud Firestore is unreachable in production.")
     else:
         if doc_id in _LOCAL_STORE.documents:
             _LOCAL_STORE.documents[doc_id].update(update_data)
@@ -440,13 +479,19 @@ def log_audit_event(
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "details": details or {},
     }
-    if _EMULATOR_REACHABLE and _FIRESTORE_CLIENT:
-        try:
-            _FIRESTORE_CLIENT.collection("auditLog").document(event_id).set(event_data)
-        except Exception:
-            _LOCAL_STORE.audit_log.append(event_data)
-    else:
-        _LOCAL_STORE.audit_log.append(event_data)
+    if not USE_EMULATOR or (_EMULATOR_REACHABLE and _FIRESTORE_CLIENT):
+        if _FIRESTORE_CLIENT is None:
+            initialize_firebase()
+        if _FIRESTORE_CLIENT:
+            try:
+                _FIRESTORE_CLIENT.collection("auditLog").document(event_id).set(event_data)
+                return
+            except Exception as e:
+                if not USE_EMULATOR:
+                    print(f"[WARN] Failed to write audit log to Firestore: {e}", flush=True)
+        elif not USE_EMULATOR:
+            raise RuntimeError("Cloud Firestore is unreachable in production.")
+    _LOCAL_STORE.audit_log.append(event_data)
 
 
 # -------------------------------------------------------------------------
@@ -466,26 +511,34 @@ def get_dashboard_metrics(owner_uid: Optional[str] = None) -> Dict[str, Any]:
         "recent_documents": [],
     }
 
-    if _EMULATOR_REACHABLE and _FIRESTORE_CLIENT:
-        coll = _FIRESTORE_CLIENT.collection("documents")
-        if owner_uid:
-            coll = coll.where("ownerUid", "==", owner_uid)
+    if not USE_EMULATOR or (_EMULATOR_REACHABLE and _FIRESTORE_CLIENT):
+        if _FIRESTORE_CLIENT is None:
+            initialize_firebase()
+        if _FIRESTORE_CLIENT:
+            from google.cloud.firestore import FieldFilter
 
-        # Use aggregation queries for performance
-        try:
-            kpis["total_documents"] = coll.count().get()[0][0].value
-            kpis["high_risk_count"] = coll.where("risk.level", "==", "HIGH").count().get()[0][0].value
-            kpis["medium_risk_count"] = coll.where("risk.level", "==", "MEDIUM").count().get()[0][0].value
-            kpis["normal_count"] = coll.where("risk.level", "==", "LOW").count().get()[0][0].value
-            kpis["approved_count"] = coll.where("review.decision", "==", "approved").count().get()[0][0].value
-            kpis["rejected_count"] = coll.where("review.decision", "==", "rejected").count().get()[0][0].value
-        except Exception:
-            pass
+            coll = _FIRESTORE_CLIENT.collection("documents")
+            if owner_uid:
+                coll = coll.where(filter=FieldFilter("ownerUid", "==", owner_uid))
 
-        # Stream recent 10 documents
-        recent_stream = coll.order_by("createdAt", direction=firestore.Query.DESCENDING).limit(10).stream()
-        kpis["recent_documents"] = [d.to_dict() for d in recent_stream]
-        return kpis
+            # Use aggregation queries for performance
+            try:
+                kpis["total_documents"] = coll.count().get()[0][0].value
+                kpis["high_risk_count"] = coll.where(filter=FieldFilter("risk.level", "==", "HIGH")).count().get()[0][0].value
+                kpis["medium_risk_count"] = coll.where(filter=FieldFilter("risk.level", "==", "MEDIUM")).count().get()[0][0].value
+                kpis["normal_count"] = coll.where(filter=FieldFilter("risk.level", "==", "LOW")).count().get()[0][0].value
+                kpis["approved_count"] = coll.where(filter=FieldFilter("review.decision", "==", "approved")).count().get()[0][0].value
+                kpis["rejected_count"] = coll.where(filter=FieldFilter("review.decision", "==", "rejected")).count().get()[0][0].value
+            except Exception as e:
+                if not USE_EMULATOR:
+                    print(f"[WARN] Error executing Firestore aggregation queries: {e}", flush=True)
+
+            # Stream recent 10 documents
+            recent_stream = coll.order_by("createdAt", direction=firestore.Query.DESCENDING).limit(10).stream()
+            kpis["recent_documents"] = [d.to_dict() for d in recent_stream]
+            return kpis
+        elif not USE_EMULATOR:
+            raise RuntimeError("Cloud Firestore is unreachable in production.")
 
     # In-Memory fallback aggregation
     docs = list(_LOCAL_STORE.documents.values())
@@ -522,12 +575,19 @@ def list_documents(
     limit: int = 50,
 ) -> List[Dict[str, Any]]:
     """List documents for table display."""
-    if _EMULATOR_REACHABLE and _FIRESTORE_CLIENT:
-        coll = _FIRESTORE_CLIENT.collection("documents")
-        if owner_uid:
-            coll = coll.where("ownerUid", "==", owner_uid)
-        stream = coll.order_by("createdAt", direction=firestore.Query.DESCENDING).limit(limit).stream()
-        return [d.to_dict() for d in stream]
+    if not USE_EMULATOR or (_EMULATOR_REACHABLE and _FIRESTORE_CLIENT):
+        if _FIRESTORE_CLIENT is None:
+            initialize_firebase()
+        if _FIRESTORE_CLIENT:
+            from google.cloud.firestore import FieldFilter
+
+            coll = _FIRESTORE_CLIENT.collection("documents")
+            if owner_uid:
+                coll = coll.where(filter=FieldFilter("ownerUid", "==", owner_uid))
+            stream = coll.order_by("createdAt", direction=firestore.Query.DESCENDING).limit(limit).stream()
+            return [d.to_dict() for d in stream]
+        elif not USE_EMULATOR:
+            raise RuntimeError("Cloud Firestore is unreachable in production.")
 
     docs = list(_LOCAL_STORE.documents.values())
     if owner_uid:
@@ -550,6 +610,13 @@ def upload_invoice_bytes(
     """Upload invoice file to Cloud Storage at users/{uid}/invoices/{docId}/{filename}."""
     storage_path = f"users/{uid}/invoices/{doc_id}/{filename}"
 
+    if not USE_EMULATOR:
+        # Production: write directly to Google Cloud Storage
+        bucket = storage.bucket(STORAGE_BUCKET)
+        blob = bucket.blob(storage_path)
+        blob.upload_from_string(file_bytes, content_type=content_type)
+        return storage_path
+
     if _EMULATOR_REACHABLE:
         try:
             bucket = storage.bucket(STORAGE_BUCKET)
@@ -565,6 +632,11 @@ def upload_invoice_bytes(
 
 def download_invoice_bytes(storage_path: str) -> Optional[bytes]:
     """Retrieve invoice file bytes from storage."""
+    if not USE_EMULATOR:
+        bucket = storage.bucket(STORAGE_BUCKET)
+        blob = bucket.blob(storage_path)
+        return blob.download_as_bytes()
+
     if storage_path in _LOCAL_STORE.storage_files:
         return _LOCAL_STORE.storage_files[storage_path]
 

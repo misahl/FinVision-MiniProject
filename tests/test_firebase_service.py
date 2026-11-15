@@ -1,6 +1,13 @@
 """Unit tests for FinVision Firebase Service Layer."""
 
+import os
+os.environ["FIREBASE_USE_EMULATOR"] = "true"
+
 import pytest
+from src import firebase_service
+firebase_service.USE_EMULATOR = True
+firebase_service._EMULATOR_REACHABLE = False
+
 from src.firebase_service import (
     sign_up_user,
     sign_in_user,

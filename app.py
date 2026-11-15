@@ -121,7 +121,8 @@ def render_auth_screen():
                 reg_name = st.text_input("Full Name", value="Alex Rivera")
                 reg_email = st.text_input("Email", value="")
                 reg_pass = st.text_input("Password (min 8 chars)", type="password")
-                reg_role = st.selectbox("Role", options=["analyst", "admin"])
+                reg_role = "analyst"
+                st.caption("Role: **Financial Analyst** (Administrator privileges must be assigned by system administrator)")
                 submit_register = st.form_submit_button("Create Account", type="primary", use_container_width=True)
 
                 if submit_register:
