@@ -4,6 +4,7 @@ Streamlit application entry point, authentication gate, and page router.
 """
 
 from pathlib import Path
+import os
 import streamlit as st
 
 from src import firebase_service
@@ -68,8 +69,8 @@ def render_auth_screen():
 
         with tab_login:
             with st.form("login_form"):
-                email = st.text_input("Work Email", value="analyst@finvision.test")
-                password = st.text_input("Password", type="password", value="FinVision2026!")
+                email = st.text_input("Work Email", placeholder="name@company.com")
+                password = st.text_input("Password", type="password", placeholder="Enter your password")
                 submit_login = st.form_submit_button("Sign In to FinVision", type="primary", use_container_width=True)
 
                 if submit_login:
@@ -88,53 +89,43 @@ def render_auth_screen():
                     except Exception as e:
                         st.error(f"Sign-in error: {str(e)}")
 
-            # Quick 1-Click Demo Login
-            st.markdown("<div style='text-align: center; margin-top: 10px;'>", unsafe_allow_html=True)
-            if st.button("⚡ Quick Demo Analyst Sign-In", use_container_width=True):
-                try:
+            demo_email = os.getenv("FINVISION_DEMO_EMAIL", "")
+            demo_password = os.getenv("FINVISION_DEMO_PASSWORD", "")
+            if demo_email and demo_password:
+                st.caption("A restricted demonstration account is available.")
+                if st.button("Open demonstration workspace", use_container_width=True):
                     try:
-                        auth_res = firebase_service.sign_in_user(
-                            email="demo_analyst@finvision.test",
-                            password="DemoPassword123!",
-                        )
-                    except Exception:
-                        auth_res = firebase_service.sign_up_user(
-                            email="demo_analyst@finvision.test",
-                            password="DemoPassword123!",
-                            display_name="Demo Financial Analyst",
-                            role="analyst",
-                        )
-                    st.session_state["user"] = {
-                        "uid": auth_res["localId"],
-                        "email": auth_res["email"],
-                        "displayName": auth_res.get("displayName", "Demo Analyst"),
-                        "role": auth_res.get("role", "analyst"),
-                    }
-                    st.session_state["id_token"] = auth_res["idToken"]
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Demo sign-in error: {str(e)}")
-            st.markdown("</div>", unsafe_allow_html=True)
+                        auth_res = firebase_service.sign_in_user(demo_email, demo_password)
+                        st.session_state["user"] = {
+                            "uid": auth_res["localId"],
+                            "email": auth_res["email"],
+                            "displayName": auth_res.get("displayName", "Demo Analyst"),
+                            "role": "analyst",
+                        }
+                        st.session_state["id_token"] = auth_res["idToken"]
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Demo sign-in error: {str(e)}")
+
 
         with tab_register:
             with st.form("register_form"):
-                reg_name = st.text_input("Full Name", value="Alex Rivera")
+                reg_name = st.text_input("Full Name", placeholder="Your full name")
                 reg_email = st.text_input("Email", value="")
                 reg_pass = st.text_input("Password (min 8 chars)", type="password")
-                reg_role = st.selectbox("Role", options=["analyst", "admin"])
                 submit_register = st.form_submit_button("Create Account", type="primary", use_container_width=True)
 
                 if submit_register:
-                    if len(reg_pass) < 6:
-                        st.error("Password must be at least 6 characters.")
+                    if len(reg_pass) < 8:
+                        st.error("Password must be at least 8 characters.")
                     else:
                         try:
-                            auth_res = firebase_service.sign_up_user(reg_email, reg_pass, reg_name, reg_role)
+                            auth_res = firebase_service.sign_up_user(reg_email, reg_pass, reg_name, "analyst")
                             st.session_state["user"] = {
                                 "uid": auth_res["localId"],
                                 "email": auth_res["email"],
                                 "displayName": reg_name,
-                                "role": reg_role,
+                                "role": "analyst",
                             }
                             st.session_state["id_token"] = auth_res["idToken"]
                             st.success("Account created successfully!")
