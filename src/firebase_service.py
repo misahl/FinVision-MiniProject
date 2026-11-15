@@ -125,6 +125,8 @@ def sign_up_user(
 ) -> Dict[str, Any]:
     """Register a new user using Firebase Identity Toolkit REST API."""
     if USE_EMULATOR and not _EMULATOR_REACHABLE:
+        if REQUIRE_FIREBASE:
+            raise RuntimeError("Firebase Emulator is unavailable; local fallback is disabled.")
         # Offline in-memory fallback
         uid = f"user_{uuid.uuid4().hex[:12]}"
         user_record = {
@@ -181,6 +183,8 @@ def sign_up_user(
 def sign_in_user(email: str, password: str) -> Dict[str, Any]:
     """Authenticate user with email and password via Identity Toolkit REST API."""
     if USE_EMULATOR and not _EMULATOR_REACHABLE:
+        if REQUIRE_FIREBASE:
+            raise RuntimeError("Firebase Emulator is unavailable; local fallback is disabled.")
         # Offline in-memory search
         for uid, u in _LOCAL_STORE.users.items():
             if u["email"].lower() == email.lower():
