@@ -342,8 +342,10 @@ def create_document_record(
 
     if _EMULATOR_REACHABLE and _FIRESTORE_CLIENT:
         _FIRESTORE_CLIENT.collection("documents").document(doc_id).set(doc_data)
-    else:
+    elif USE_EMULATOR:
         _LOCAL_STORE.documents[doc_id] = doc_data
+    else:
+        raise RuntimeError("Firestore is unavailable; refusing to create a non-persistent document record.")
 
     log_audit_event(owner_uid, doc_id, "DOCUMENT_UPLOADED", {"filename": file_metadata.get("filename")})
     return doc_id
@@ -390,7 +392,7 @@ def save_document_analysis(
         for idx, item in enumerate(line_items):
             item_id = f"item_{idx+1:03d}"
             doc_ref.collection("lineItems").document(item_id).set(item)
-    else:
+    elif USE_EMULATOR:
         if doc_id in _LOCAL_STORE.documents:
             _LOCAL_STORE.documents[doc_id].update(update_payload)
             if storage_path:
@@ -400,10 +402,12 @@ def save_document_analysis(
             if storage_path:
                 doc_record.setdefault("file", {})["storagePath"] = storage_path
             _LOCAL_STORE.documents[doc_id] = doc_record
-        
+
         _LOCAL_STORE.line_items[doc_id] = {
             f"item_{idx+1:03d}": it for idx, it in enumerate(line_items)
         }
+    else:
+        raise RuntimeError("Firestore is unavailable; refusing to save analysis only in temporary memory.")
 
 
 def get_document(doc_id: str) -> Optional[Dict[str, Any]]:
@@ -418,6 +422,8 @@ def get_document(doc_id: str) -> Optional[Dict[str, Any]]:
         data["lineItems"] = [item.to_dict() for item in items_ref]
         return data
 
+    if not USE_EMULATOR:
+        raise RuntimeError("Firestore is unavailable; document records cannot be read from temporary memory.")
     doc_data = _LOCAL_STORE.documents.get(doc_id)
     if doc_data:
         data = dict(doc_data)
@@ -448,9 +454,11 @@ def update_document_review_decision(
 
     if _EMULATOR_REACHABLE and _FIRESTORE_CLIENT:
         _FIRESTORE_CLIENT.collection("documents").document(doc_id).update(update_data)
-    else:
+    elif USE_EMULATOR:
         if doc_id in _LOCAL_STORE.documents:
             _LOCAL_STORE.documents[doc_id].update(update_data)
+    else:
+        raise RuntimeError("Firestore is unavailable; refusing to record a review only in temporary memory.")
 
     log_audit_event(
         reviewer_uid,
@@ -480,9 +488,14 @@ def log_audit_event(
         try:
             _FIRESTORE_CLIENT.collection("auditLog").document(event_id).set(event_data)
         except Exception:
-            _LOCAL_STORE.audit_log.append(event_data)
-    else:
+            if USE_EMULATOR:
+                _LOCAL_STORE.audit_log.append(event_data)
+            else:
+                raise
+    elif USE_EMULATOR:
         _LOCAL_STORE.audit_log.append(event_data)
+    else:
+        raise RuntimeError("Firestore is unavailable; audit events cannot be stored persistently.")
 
 
 # -------------------------------------------------------------------------
@@ -524,6 +537,8 @@ def get_dashboard_metrics(owner_uid: Optional[str] = None) -> Dict[str, Any]:
         return kpis
 
     # In-Memory fallback aggregation
+    if not USE_EMULATOR:
+        raise RuntimeError("Firestore is unavailable; refusing to return an incomplete in-memory document list.")
     docs = list(_LOCAL_STORE.documents.values())
     if owner_uid:
         docs = [d for d in docs if d.get("ownerUid") == owner_uid]
@@ -565,6 +580,8 @@ def list_documents(
         stream = coll.order_by("createdAt", direction=firestore.Query.DESCENDING).limit(limit).stream()
         return [d.to_dict() for d in stream]
 
+    if not USE_EMULATOR:
+        raise RuntimeError("Firestore is unavailable; document history cannot be read from temporary memory.")
     docs = list(_LOCAL_STORE.documents.values())
     if owner_uid:
         docs = [d for d in docs if d.get("ownerUid") == owner_uid]
