@@ -356,3 +356,10 @@ div[data-testid="stDataFrame"] {
   div[data-testid="stMetric"] { padding:.65rem !important; }
   div[data-testid="stDataFrame"] { overflow-x:auto; }
 }
+
+
+/* Authentication page */
+.fv-auth-intro { max-width:680px; margin:2.4rem auto 1.6rem; text-align:center; }
+.fv-auth-mark { display:grid; place-items:center; width:54px; height:54px; margin:0 auto 1rem; border-radius:16px; background:#142C49; color:#FFFFFF; font-weight:800; letter-spacing:-.04em; box-shadow:0 8px 24px rgba(20,44,73,.16); }
+.fv-auth-intro h1 { margin:.45rem 0 !important; font-size:clamp(1.8rem,4vw,2.55rem) !important; letter-spacing:-.045em !important; }
+.fv-auth-intro p { max-width:500px; margin:0 auto !important; color:#667085 !important; }
