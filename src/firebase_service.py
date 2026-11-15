@@ -105,8 +105,13 @@ def initialize_firebase():
                     _EMULATOR_REACHABLE = False
             else:
                 _EMULATOR_REACHABLE = True
-        except Exception:
+        except Exception as exc:
             _EMULATOR_REACHABLE = False
+            if REQUIRE_FIREBASE:
+                raise RuntimeError(
+                    "Firebase initialization failed. Check Firebase credentials, project ID, "
+                    "storage bucket, and network access."
+                ) from exc
 
 
 # Initial attempt to hook into Firebase Admin
