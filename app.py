@@ -3,23 +3,15 @@
 Streamlit application entry point, authentication gate, and page router.
 """
 
+from html import escape
 from pathlib import Path
+import os
+
 import streamlit as st
 
 from src import firebase_service
-from frontend import (
-    dashboard,
-    upload,
-    verify,
-    history,
-    analytics,
-    reports,
-    settings,
-)
+from frontend import dashboard, upload, verify, history, analytics, reports, settings
 
-# -------------------------------------------------------------------------
-# Streamlit Application Configuration
-# -------------------------------------------------------------------------
 
 st.set_page_config(
     page_title="FinVision | Financial Document Verification",
@@ -28,155 +20,153 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# Inject modern fintech stylesheet once
 CSS_PATH = Path(__file__).parent / "frontend" / "styles.css"
 if CSS_PATH.exists():
-    with open(CSS_PATH, "r", encoding="utf-8") as f:
-        st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
+    st.markdown(
+        f"<style>{CSS_PATH.read_text(encoding='utf-8')}</style>",
+        unsafe_allow_html=True,
+    )
 
-# -------------------------------------------------------------------------
-# Session State & Authentication Gate
-# -------------------------------------------------------------------------
+for key, default in {
+    "user": None,
+    "id_token": None,
+    "nav_page": "Dashboard",
+}.items():
+    if key not in st.session_state:
+        st.session_state[key] = default
 
-if "user" not in st.session_state:
-    st.session_state["user"] = None
-if "id_token" not in st.session_state:
-    st.session_state["id_token"] = None
-if "nav_page" not in st.session_state:
-    st.session_state["nav_page"] = "Dashboard"
+
+def _establish_session(auth_res: dict) -> None:
+    """Create a session using the verified Firebase token claims."""
+    claims = firebase_service.verify_user_token(auth_res["idToken"])
+    st.session_state["user"] = {
+        "uid": claims["uid"],
+        "email": claims.get("email") or auth_res.get("email", ""),
+        "displayName": auth_res.get("displayName", "Analyst"),
+        # Privileges come from verified server-side claims, never a form field.
+        "role": claims.get("role", "analyst"),
+    }
+    st.session_state["id_token"] = auth_res["idToken"]
 
 
 def render_auth_screen():
-    """Render modern login and registration interface."""
-    st.markdown("<div style='text-align: center; margin-top: 40px;'>", unsafe_allow_html=True)
-    st.markdown("# 🛡️ FinVision")
-    st.markdown("### Intelligent Financial Document Verification System")
+    """Render the public sign-in and analyst registration interface."""
     st.markdown(
-        "<p style='color: #64748B; max-width: 500px; margin: 0 auto;'>"
-        "Firebase-native AI/ML invoice verification with explainable computer vision anomaly detection "
-        "and deterministic financial rules."
-        "</p>",
+        """
+        <div class="fv-auth-intro">
+          <div class="fv-auth-mark">FV</div>
+          <div class="fv-eyebrow">FINANCIAL DOCUMENT INTELLIGENCE</div>
+          <h1>Clarity behind every invoice.</h1>
+          <p>Extract, verify and review financial documents with an explainable workflow.</p>
+        </div>
+        """,
         unsafe_allow_html=True,
     )
-    st.markdown("</div>", unsafe_allow_html=True)
 
-    col_space1, col_center, col_space2 = st.columns([1, 1.2, 1])
+    _, center, _ = st.columns([1, 1.15, 1])
+    with center:
+        login_tab, register_tab = st.tabs(["Sign in", "Create analyst account"])
 
-    with col_center:
-        st.markdown("<br/>", unsafe_allow_html=True)
-        tab_login, tab_register = st.tabs(["Sign In", "Create Account"])
-
-        with tab_login:
+        with login_tab:
             with st.form("login_form"):
-                email = st.text_input("Work Email", value="analyst@finvision.test")
-                password = st.text_input("Password", type="password", value="FinVision2026!")
-                submit_login = st.form_submit_button("Sign In to FinVision", type="primary", use_container_width=True)
-
-                if submit_login:
+                email = st.text_input("Work email", placeholder="name@company.com")
+                password = st.text_input("Password", type="password", placeholder="Enter your password")
+                submitted = st.form_submit_button(
+                    "Sign in to FinVision", type="primary", use_container_width=True
+                )
+            if submitted:
+                if not email.strip() or not password:
+                    st.error("Enter your work email and password.")
+                else:
                     try:
-                        auth_res = firebase_service.sign_in_user(email, password)
-                        claims = firebase_service.verify_user_token(auth_res["idToken"])
-                        st.session_state["user"] = {
-                            "uid": auth_res["localId"],
-                            "email": auth_res["email"],
-                            "displayName": auth_res.get("displayName", "Analyst"),
-                            "role": auth_res.get("role", "analyst"),
-                        }
-                        st.session_state["id_token"] = auth_res["idToken"]
-                        st.success("Authentication successful!")
+                        auth_res = firebase_service.sign_in_user(email.strip(), password)
+                        _establish_session(auth_res)
                         st.rerun()
-                    except Exception as e:
-                        st.error(f"Sign-in error: {str(e)}")
-
-            # Quick 1-Click Demo Login
-            st.markdown("<div style='text-align: center; margin-top: 10px;'>", unsafe_allow_html=True)
-            if st.button("⚡ Quick Demo Analyst Sign-In", use_container_width=True):
-                try:
-                    try:
-                        auth_res = firebase_service.sign_in_user(
-                            email="demo_analyst@finvision.test",
-                            password="DemoPassword123!",
-                        )
                     except Exception:
+                        st.error("Sign-in failed. Check your credentials or contact your workspace administrator.")
+
+            # Demo access is opt-in and must use an account provisioned by the owner.
+            if os.getenv("FINVISION_ENABLE_DEMO_LOGIN", "false").lower() in {"1", "true", "yes"}:
+                st.caption("Demonstration access")
+                with st.form("demo_login_form"):
+                    demo_email = st.text_input("Demo account email", key="demo_email")
+                    demo_password = st.text_input("Demo account password", type="password", key="demo_password")
+                    demo_submitted = st.form_submit_button("Sign in to demo workspace", use_container_width=True)
+                if demo_submitted:
+                    try:
+                        auth_res = firebase_service.sign_in_user(demo_email.strip(), demo_password)
+                        _establish_session(auth_res)
+                        st.rerun()
+                    except Exception:
+                        st.error("Demo sign-in failed. Please contact the demonstration administrator.")
+
+        with register_tab:
+            st.caption("New accounts receive analyst access. Administrator privileges are assigned separately by the workspace owner.")
+            with st.form("register_form"):
+                reg_name = st.text_input("Full name", placeholder="Your name")
+                reg_email = st.text_input("Work email", placeholder="name@company.com")
+                reg_password = st.text_input("Password (minimum 8 characters)", type="password")
+                confirm_password = st.text_input("Confirm password", type="password")
+                register = st.form_submit_button(
+                    "Create analyst account", type="primary", use_container_width=True
+                )
+
+            if register:
+                if not reg_name.strip() or not reg_email.strip():
+                    st.error("Enter your name and work email.")
+                elif len(reg_password) < 8:
+                    st.error("Use a password with at least 8 characters.")
+                elif reg_password != confirm_password:
+                    st.error("The passwords do not match.")
+                else:
+                    try:
                         auth_res = firebase_service.sign_up_user(
-                            email="demo_analyst@finvision.test",
-                            password="DemoPassword123!",
-                            display_name="Demo Financial Analyst",
+                            reg_email.strip(),
+                            reg_password,
+                            reg_name.strip(),
                             role="analyst",
                         )
-                    st.session_state["user"] = {
-                        "uid": auth_res["localId"],
-                        "email": auth_res["email"],
-                        "displayName": auth_res.get("displayName", "Demo Analyst"),
-                        "role": auth_res.get("role", "analyst"),
-                    }
-                    st.session_state["id_token"] = auth_res["idToken"]
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Demo sign-in error: {str(e)}")
-            st.markdown("</div>", unsafe_allow_html=True)
+                        _establish_session(auth_res)
+                        st.success("Your analyst account has been created.")
+                        st.rerun()
+                    except Exception:
+                        st.error("Account creation failed. Check the email address or contact your workspace administrator.")
 
-        with tab_register:
-            with st.form("register_form"):
-                reg_name = st.text_input("Full Name", value="Alex Rivera")
-                reg_email = st.text_input("Email", value="")
-                reg_pass = st.text_input("Password (min 8 chars)", type="password")
-                reg_role = st.selectbox("Role", options=["analyst", "admin"])
-                submit_register = st.form_submit_button("Create Account", type="primary", use_container_width=True)
-
-                if submit_register:
-                    if len(reg_pass) < 6:
-                        st.error("Password must be at least 6 characters.")
-                    else:
-                        try:
-                            auth_res = firebase_service.sign_up_user(reg_email, reg_pass, reg_name, reg_role)
-                            st.session_state["user"] = {
-                                "uid": auth_res["localId"],
-                                "email": auth_res["email"],
-                                "displayName": reg_name,
-                                "role": reg_role,
-                            }
-                            st.session_state["id_token"] = auth_res["idToken"]
-                            st.success("Account created successfully!")
-                            st.rerun()
-                        except Exception as e:
-                            st.error(f"Registration error: {str(e)}")
-
-
-# -------------------------------------------------------------------------
-# Authenticated Navigation & Routing
-# -------------------------------------------------------------------------
 
 def render_app():
     user = st.session_state["user"]
 
-    # Verify ID token validity on every request
     try:
-        firebase_service.verify_user_token(st.session_state["id_token"])
+        claims = firebase_service.verify_user_token(st.session_state["id_token"])
+        if claims.get("uid") != user.get("uid"):
+            raise PermissionError("Session identity mismatch")
+        # Refresh the role from verified claims on every rerun.
+        user["role"] = claims.get("role", "analyst")
     except Exception:
         st.session_state["user"] = None
         st.session_state["id_token"] = None
-        st.warning("Your session has expired. Please log in again.")
+        st.warning("Your session has expired. Please sign in again.")
         st.rerun()
 
-    # Sidebar Navigation
     with st.sidebar:
         st.markdown(
             """
             <div style="padding: 10px 0 20px 0;">
-                <h2 style="margin: 0; color: #FFFFFF; font-size: 1.4rem;">🛡️ FinVision</h2>
-                <span style="color: #60A5FA; font-size: 0.8rem; font-weight: 500;">DOCUMENT VERIFICATION</span>
+              <h2 style="margin:0;color:#FFFFFF;font-size:1.4rem;">🛡️ FinVision</h2>
+              <span style="color:#93B4DD;font-size:.75rem;font-weight:650;letter-spacing:.08em;">DOCUMENT INTELLIGENCE</span>
             </div>
             """,
             unsafe_allow_html=True,
         )
-
+        safe_name = escape(str(user.get("displayName", "Analyst")))
+        safe_email = escape(str(user.get("email", "")))
+        safe_role = escape(str(user.get("role", "analyst")).upper())
         st.markdown(
             f"""
-            <div style="background-color: #1E293B; border-radius: 8px; padding: 12px; margin-bottom: 20px;">
-                <div style="font-weight: 600; color: #F8FAFC; font-size: 0.9rem;">{user.get('displayName', 'Analyst')}</div>
-                <div style="color: #94A3B8; font-size: 0.78rem;">{user.get('email', '')}</div>
-                <div style="margin-top: 6px;"><span class="badge-low">{user.get('role', 'analyst').upper()}</span></div>
+            <div style="background:#1E293B;border:1px solid #334155;border-radius:10px;padding:13px;margin-bottom:18px;">
+              <div style="font-weight:650;color:#F8FAFC;font-size:.9rem;">{safe_name}</div>
+              <div style="color:#AAB8CC;font-size:.76rem;overflow-wrap:anywhere;">{safe_email}</div>
+              <div style="margin-top:8px;"><span class="badge-low">{safe_role}</span></div>
             </div>
             """,
             unsafe_allow_html=True,
@@ -191,12 +181,9 @@ def render_app():
             "Reports",
             "Settings",
         ]
-
-        # Sync nav selection
         current_page = st.session_state.get("nav_page", "Dashboard")
         if current_page not in nav_options:
             current_page = "Dashboard"
-
         selected_page = st.radio(
             "Navigation",
             options=nav_options,
@@ -206,35 +193,24 @@ def render_app():
         st.session_state["nav_page"] = selected_page
 
         st.markdown("---")
-        if st.button("🚪 Sign Out", use_container_width=True):
-            st.session_state["user"] = None
-            st.session_state["id_token"] = None
-            st.session_state["selected_doc_id"] = None
+        if st.button("Sign out", use_container_width=True):
+            for key in ("user", "id_token", "selected_doc_id"):
+                st.session_state[key] = None
             st.rerun()
 
-    # Page Router
-    if selected_page == "Dashboard":
-        dashboard.render_dashboard(user)
-    elif selected_page == "Upload Invoice":
-        upload.render_upload(user)
-    elif selected_page == "Verify Documents":
-        verify.render_verify(user)
-    elif selected_page == "Document History":
-        history.render_history(user)
-    elif selected_page == "Analytics":
-        analytics.render_analytics(user)
-    elif selected_page == "Reports":
-        reports.render_reports(user)
-    elif selected_page == "Settings":
-        settings.render_settings(user)
+    page_map = {
+        "Dashboard": dashboard.render_dashboard,
+        "Upload Invoice": upload.render_upload,
+        "Verify Documents": verify.render_verify,
+        "Document History": history.render_history,
+        "Analytics": analytics.render_analytics,
+        "Reports": reports.render_reports,
+        "Settings": settings.render_settings,
+    }
+    page_map[selected_page](user)
 
-
-# -------------------------------------------------------------------------
-# Main Execution Gate
-# -------------------------------------------------------------------------
 
 if st.session_state["user"] is None:
     render_auth_screen()
 else:
     render_app()
-
