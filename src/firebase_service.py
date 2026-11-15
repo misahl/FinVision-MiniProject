@@ -24,11 +24,26 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# Firebase Environment Variables
-USE_EMULATOR = os.getenv("FIREBASE_USE_EMULATOR", "true").lower() in ("true", "1", "yes")
-PROJECT_ID = os.getenv("FIREBASE_PROJECT_ID", "finvision-dev")
-STORAGE_BUCKET = os.getenv("FIREBASE_STORAGE_BUCKET", f"{PROJECT_ID}.appspot.com")
-API_KEY = os.getenv("FIREBASE_API_KEY", "fake-api-key-for-emulator")
+# Firebase configuration. Emulator use is opt-in; production never silently mocks data.
+def _setting(name: str, default: Optional[str] = None) -> Optional[str]:
+    value = os.getenv(name)
+    if value:
+        return value
+    try:
+        import streamlit as st
+        secret = st.secrets.get(name)
+        if secret is not None:
+            return str(secret)
+    except Exception:
+        pass
+    return default
+
+
+USE_EMULATOR = (_setting("FIREBASE_USE_EMULATOR", "false") or "false").lower() in ("true", "1", "yes")
+PROJECT_ID = _setting("FIREBASE_PROJECT_ID", "finvision-dev") or "finvision-dev"
+STORAGE_BUCKET = _setting("FIREBASE_STORAGE_BUCKET", f"{PROJECT_ID}.appspot.com") or f"{PROJECT_ID}.appspot.com"
+API_KEY = _setting("FIREBASE_API_KEY", "emulator-api-key" if USE_EMULATOR else "") or ""
+SERVICE_ACCOUNT_JSON = _setting("FIREBASE_SERVICE_ACCOUNT_JSON", "") or ""
 
 AUTH_EMU_HOST = os.getenv("FIREBASE_AUTH_EMULATOR_HOST", "127.0.0.1:9099")
 FIRESTORE_EMU_HOST = os.getenv("FIRESTORE_EMULATOR_HOST", "127.0.0.1:8080")
@@ -75,37 +90,49 @@ _EMULATOR_REACHABLE = False
 
 
 def initialize_firebase():
-    """Initialize Firebase Admin SDK and test connection to emulators or cloud."""
+    """Initialize Firebase Admin SDK; fail closed outside local emulator mode."""
     global _FIREBASE_APP, _FIRESTORE_CLIENT, _STORAGE_BUCKET_CLIENT, _EMULATOR_REACHABLE
 
-    if _FIREBASE_APP is None:
-        try:
-            if not firebase_admin._apps:
-                cred_path = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
-                if cred_path and Path(cred_path).exists() and not USE_EMULATOR:
-                    cred = credentials.Certificate(cred_path)
-                    _FIREBASE_APP = firebase_admin.initialize_app(
-                        cred, {"storageBucket": STORAGE_BUCKET, "projectId": PROJECT_ID}
-                    )
-                else:
-                    _FIREBASE_APP = firebase_admin.initialize_app(
-                        options={"projectId": PROJECT_ID, "storageBucket": STORAGE_BUCKET}
-                    )
-            else:
-                _FIREBASE_APP = firebase_admin.get_app()
+    if _FIREBASE_APP is not None:
+        return
 
-            _FIRESTORE_CLIENT = firestore.client()
-            # Test if emulator is reachable
-            if USE_EMULATOR:
-                try:
-                    resp = requests.get(f"http://{FIRESTORE_EMU_HOST}", timeout=0.8)
-                    _EMULATOR_REACHABLE = True
-                except Exception:
-                    _EMULATOR_REACHABLE = False
-            else:
+    try:
+        if not firebase_admin._apps:
+            cred = None
+            if not USE_EMULATOR:
+                if SERVICE_ACCOUNT_JSON:
+                    try:
+                        service_account_info = json.loads(SERVICE_ACCOUNT_JSON)
+                    except json.JSONDecodeError as exc:
+                        raise RuntimeError("FIREBASE_SERVICE_ACCOUNT_JSON must contain valid JSON.") from exc
+                    cred = credentials.Certificate(service_account_info)
+                else:
+                    cred_path = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+                    if cred_path and Path(cred_path).exists():
+                        cred = credentials.Certificate(cred_path)
+                    # Otherwise use Application Default Credentials (e.g. Cloud Run).
+            options = {"projectId": PROJECT_ID, "storageBucket": STORAGE_BUCKET}
+            _FIREBASE_APP = firebase_admin.initialize_app(cred, options) if cred else firebase_admin.initialize_app(options=options)
+        else:
+            _FIREBASE_APP = firebase_admin.get_app()
+
+        _FIRESTORE_CLIENT = firestore.client()
+        if USE_EMULATOR:
+            try:
+                requests.get(f"http://{FIRESTORE_EMU_HOST}", timeout=0.8)
                 _EMULATOR_REACHABLE = True
-        except Exception:
-            _EMULATOR_REACHABLE = False
+            except Exception:
+                _EMULATOR_REACHABLE = False
+        else:
+            # The Admin SDK is configured with production credentials/ADC.
+            _EMULATOR_REACHABLE = True
+    except Exception as exc:
+        _EMULATOR_REACHABLE = False
+        if not USE_EMULATOR:
+            raise RuntimeError(
+                "Firebase production initialization failed. Configure FIREBASE_PROJECT_ID, "
+                "FIREBASE_API_KEY and FIREBASE_SERVICE_ACCOUNT_JSON (or Application Default Credentials)."
+            ) from exc
 
 
 # Initial attempt to hook into Firebase Admin
@@ -122,7 +149,11 @@ def sign_up_user(
     display_name: str,
     role: str = "analyst",
 ) -> Dict[str, Any]:
-    """Register a new user using Firebase Identity Toolkit REST API."""
+    """Register an analyst using Firebase Identity Toolkit REST API."""
+    if role != "analyst":
+        raise PermissionError("Public self-registration is limited to the analyst role.")
+    if not API_KEY:
+        raise RuntimeError("FIREBASE_API_KEY is not configured.")
     if USE_EMULATOR and not _EMULATOR_REACHABLE:
         # Offline in-memory fallback
         uid = f"user_{uuid.uuid4().hex[:12]}"
@@ -164,8 +195,8 @@ def sign_up_user(
     try:
         admin_auth.set_custom_user_claims(uid, {"role": role})
         create_user_profile(uid, display_name, email, role)
-    except Exception:
-        pass
+    except Exception as exc:
+        raise RuntimeError("Firebase account was created, but its profile/role setup failed.") from exc
 
     return {
         "idToken": id_token,
@@ -178,7 +209,9 @@ def sign_up_user(
 
 
 def sign_in_user(email: str, password: str) -> Dict[str, Any]:
-    """Authenticate user with email and password via Identity Toolkit REST API."""
+    """Authenticate with Firebase Identity Toolkit; mock accounts are emulator-only."""
+    if not API_KEY:
+        raise RuntimeError("FIREBASE_API_KEY is not configured.")
     if USE_EMULATOR and not _EMULATOR_REACHABLE:
         # Offline in-memory search
         for uid, u in _LOCAL_STORE.users.items():
@@ -191,8 +224,7 @@ def sign_in_user(email: str, password: str) -> Dict[str, Any]:
                     "displayName": u.get("displayName", "Analyst"),
                     "role": u.get("role", "analyst"),
                 }
-        # If not found in mock store, create temporary session for convenience
-        return sign_up_user(email, password, display_name="Test Analyst", role="analyst")
+        raise ValueError("No local emulator account exists for this email. Register an account first.")
 
     if USE_EMULATOR:
         url = f"http://{AUTH_EMU_HOST}/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key={API_KEY}"
@@ -220,7 +252,7 @@ def sign_in_user(email: str, password: str) -> Dict[str, Any]:
 
 def verify_user_token(id_token: str) -> Dict[str, Any]:
     """Verify Firebase ID token and return claims dict with user identity."""
-    if id_token.startswith("mock-token-"):
+    if USE_EMULATOR and id_token.startswith("mock-token-"):
         uid = id_token.replace("mock-token-", "")
         user = _LOCAL_STORE.users.get(uid, {"uid": uid, "email": "analyst@finvision.local", "role": "analyst"})
         return {"uid": uid, "email": user.get("email"), "role": user.get("role", "analyst")}
@@ -246,8 +278,10 @@ def create_user_profile(uid: str, display_name: str, email: str, role: str):
     }
     if _EMULATOR_REACHABLE and _FIRESTORE_CLIENT:
         _FIRESTORE_CLIENT.collection("users").document(uid).set(profile)
-    else:
+    elif USE_EMULATOR:
         _LOCAL_STORE.users[uid] = profile
+    else:
+        raise RuntimeError("Firestore is unavailable; refusing to store user profiles in temporary memory.")
 
 
 def get_user_profile(uid: str) -> Dict[str, Any]:
@@ -256,7 +290,9 @@ def get_user_profile(uid: str) -> Dict[str, Any]:
         doc = _FIRESTORE_CLIENT.collection("users").document(uid).get()
         if doc.exists:
             return doc.to_dict()
-    return _LOCAL_STORE.users.get(uid, {"displayName": "Analyst", "role": "analyst"})
+    if USE_EMULATOR:
+        return _LOCAL_STORE.users.get(uid, {"displayName": "Analyst", "role": "analyst"})
+    raise RuntimeError("Firestore is unavailable; user profiles cannot be read from temporary memory.")
 
 
 # -------------------------------------------------------------------------
@@ -306,8 +342,10 @@ def create_document_record(
 
     if _EMULATOR_REACHABLE and _FIRESTORE_CLIENT:
         _FIRESTORE_CLIENT.collection("documents").document(doc_id).set(doc_data)
-    else:
+    elif USE_EMULATOR:
         _LOCAL_STORE.documents[doc_id] = doc_data
+    else:
+        raise RuntimeError("Firestore is unavailable; refusing to create a non-persistent document record.")
 
     log_audit_event(owner_uid, doc_id, "DOCUMENT_UPLOADED", {"filename": file_metadata.get("filename")})
     return doc_id
@@ -354,7 +392,7 @@ def save_document_analysis(
         for idx, item in enumerate(line_items):
             item_id = f"item_{idx+1:03d}"
             doc_ref.collection("lineItems").document(item_id).set(item)
-    else:
+    elif USE_EMULATOR:
         if doc_id in _LOCAL_STORE.documents:
             _LOCAL_STORE.documents[doc_id].update(update_payload)
             if storage_path:
@@ -364,10 +402,12 @@ def save_document_analysis(
             if storage_path:
                 doc_record.setdefault("file", {})["storagePath"] = storage_path
             _LOCAL_STORE.documents[doc_id] = doc_record
-        
+
         _LOCAL_STORE.line_items[doc_id] = {
             f"item_{idx+1:03d}": it for idx, it in enumerate(line_items)
         }
+    else:
+        raise RuntimeError("Firestore is unavailable; refusing to save analysis only in temporary memory.")
 
 
 def get_document(doc_id: str) -> Optional[Dict[str, Any]]:
@@ -382,6 +422,8 @@ def get_document(doc_id: str) -> Optional[Dict[str, Any]]:
         data["lineItems"] = [item.to_dict() for item in items_ref]
         return data
 
+    if not USE_EMULATOR:
+        raise RuntimeError("Firestore is unavailable; document records cannot be read from temporary memory.")
     doc_data = _LOCAL_STORE.documents.get(doc_id)
     if doc_data:
         data = dict(doc_data)
@@ -412,9 +454,11 @@ def update_document_review_decision(
 
     if _EMULATOR_REACHABLE and _FIRESTORE_CLIENT:
         _FIRESTORE_CLIENT.collection("documents").document(doc_id).update(update_data)
-    else:
+    elif USE_EMULATOR:
         if doc_id in _LOCAL_STORE.documents:
             _LOCAL_STORE.documents[doc_id].update(update_data)
+    else:
+        raise RuntimeError("Firestore is unavailable; refusing to record a review only in temporary memory.")
 
     log_audit_event(
         reviewer_uid,
@@ -444,9 +488,14 @@ def log_audit_event(
         try:
             _FIRESTORE_CLIENT.collection("auditLog").document(event_id).set(event_data)
         except Exception:
-            _LOCAL_STORE.audit_log.append(event_data)
-    else:
+            if USE_EMULATOR:
+                _LOCAL_STORE.audit_log.append(event_data)
+            else:
+                raise
+    elif USE_EMULATOR:
         _LOCAL_STORE.audit_log.append(event_data)
+    else:
+        raise RuntimeError("Firestore is unavailable; audit events cannot be stored persistently.")
 
 
 # -------------------------------------------------------------------------
@@ -488,6 +537,8 @@ def get_dashboard_metrics(owner_uid: Optional[str] = None) -> Dict[str, Any]:
         return kpis
 
     # In-Memory fallback aggregation
+    if not USE_EMULATOR:
+        raise RuntimeError("Firestore is unavailable; refusing to return an incomplete in-memory document list.")
     docs = list(_LOCAL_STORE.documents.values())
     if owner_uid:
         docs = [d for d in docs if d.get("ownerUid") == owner_uid]
@@ -529,6 +580,8 @@ def list_documents(
         stream = coll.order_by("createdAt", direction=firestore.Query.DESCENDING).limit(limit).stream()
         return [d.to_dict() for d in stream]
 
+    if not USE_EMULATOR:
+        raise RuntimeError("Firestore is unavailable; document history cannot be read from temporary memory.")
     docs = list(_LOCAL_STORE.documents.values())
     if owner_uid:
         docs = [d for d in docs if d.get("ownerUid") == owner_uid]
@@ -559,13 +612,15 @@ def upload_invoice_bytes(
         except Exception:
             pass
 
-    _LOCAL_STORE.storage_files[storage_path] = file_bytes
-    return storage_path
+    if USE_EMULATOR:
+        _LOCAL_STORE.storage_files[storage_path] = file_bytes
+        return storage_path
+    raise RuntimeError("Cloud Storage upload failed. Refusing to keep an invoice only in temporary memory.")
 
 
 def download_invoice_bytes(storage_path: str) -> Optional[bytes]:
     """Retrieve invoice file bytes from storage."""
-    if storage_path in _LOCAL_STORE.storage_files:
+    if USE_EMULATOR and storage_path in _LOCAL_STORE.storage_files:
         return _LOCAL_STORE.storage_files[storage_path]
 
     if _EMULATOR_REACHABLE:
@@ -574,6 +629,8 @@ def download_invoice_bytes(storage_path: str) -> Optional[bytes]:
             blob = bucket.blob(storage_path)
             return blob.download_as_bytes()
         except Exception:
-            return None
+            if USE_EMULATOR:
+                return None
+            raise
     return None
 

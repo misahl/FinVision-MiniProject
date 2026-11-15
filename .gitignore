@@ -5,6 +5,7 @@ venv/
 ENV/
 
 # Secrets and credentials
+.streamlit/secrets.toml
 .env
 *.env
 serviceAccount*.json
