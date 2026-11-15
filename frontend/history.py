@@ -1,35 +1,39 @@
-"""Document History & Audit Trail Search for FinVision."""
+"""Document History & Search Archive for FinVision."""
 
-import streamlit as st
+from typing import Any, Dict, List
 import pandas as pd
+import streamlit as st
 
 from frontend.components import render_risk_badge
 from src import firebase_service
 
 
-def render_history(user: dict):
-    """Render searchable history table with filters and cursor pagination."""
-    st.markdown("## Document Archive & Portfolio History")
-    st.markdown("Search across verified invoices, filter by vendor, risk rating, or review decision.")
+def render_history(user: Dict[str, Any]):
+    """Render searchable history table with filters, sorting, and pagination."""
+    st.markdown("## 📜 Document History & Archive")
+    st.caption("Search portfolio invoices, filter by vendor, date range, or audit outcome, and open detailed verification records.")
 
     owner_uid = None if user.get("role") == "admin" else user.get("uid")
-    docs = firebase_service.list_documents(owner_uid=owner_uid, limit=100)
+    docs = firebase_service.list_documents(owner_uid=owner_uid, limit=200)
 
     if not docs:
-        st.info("No documents found in archive.")
+        st.info("No documents found in archive. Upload an invoice to build your document portfolio.")
         return
 
     # Filter Controls
-    col_search, col_risk_filt, col_status_filt = st.columns([1.5, 1, 1])
+    f_col1, f_col2, f_col3, f_col4 = st.columns([1.5, 1, 1, 1])
 
-    with col_search:
+    with f_col1:
         search_query = st.text_input("Search (Invoice #, Vendor, Customer)", placeholder="Search keyword...")
 
-    with col_risk_filt:
-        risk_filter = st.selectbox("Risk Level", options=["ALL", "LOW", "MEDIUM", "HIGH"])
+    with f_col2:
+        risk_filter = st.selectbox("Risk Rating", options=["ALL", "LOW", "MEDIUM", "HIGH"])
 
-    with col_status_filt:
-        status_filter = st.selectbox("Decision Status", options=["ALL", "approved", "rejected", "needs_review", "unreviewed"])
+    with f_col3:
+        status_filter = st.selectbox("Review Decision", options=["ALL", "approved", "rejected", "flagged", "needs_review", "unreviewed"])
+
+    with f_col4:
+        sort_order = st.selectbox("Sort by Upload Date", options=["Newest First", "Oldest First"])
 
     # Filter records in memory
     filtered = []
@@ -58,11 +62,28 @@ def render_history(user: dict):
         if match_search and match_risk and match_status:
             filtered.append(d)
 
+    # Sort
+    filtered.sort(
+        key=lambda x: str(x.get("createdAt", "")),
+        reverse=(sort_order == "Newest First"),
+    )
+
     st.markdown(f"**Showing {len(filtered)} matching document(s):**")
 
     if filtered:
+        # Pagination setup
+        page_size = 15
+        total_pages = max(1, (len(filtered) + page_size - 1) // page_size)
+        curr_page = st.selectbox(
+            "Page",
+            options=list(range(1, total_pages + 1)),
+            format_func=lambda p: f"Page {p} of {total_pages}",
+        )
+        start_idx = (curr_page - 1) * page_size
+        paged_docs = filtered[start_idx:start_idx + page_size]
+
         rows = []
-        for d in filtered:
+        for d in paged_docs:
             fields = d.get("fields", {})
             risk = d.get("risk", {})
             review = d.get("review") or {}
@@ -72,23 +93,25 @@ def render_history(user: dict):
                 "Vendor": fields.get("vendor") or "N/A",
                 "Date": fields.get("date") or "N/A",
                 "Total Amount": f"${float(fields.get('total', 0.0)):,.2f}" if fields.get("total") else "N/A",
-                "Risk Level": risk.get("level", "LOW"),
+                "Risk Rating": risk.get("level", "LOW"),
                 "Risk Score": f"{risk.get('score', 0):.0f}",
                 "Review Decision": (review.get("decision") or "unreviewed").title(),
-                "Created At": d.get("createdAt", "")[:10],
+                "Upload Timestamp": str(d.get("createdAt", ""))[:19].replace("T", " "),
             })
         st.dataframe(pd.DataFrame(rows), use_container_width=True)
 
-        st.markdown("### Quick Navigate to Document Audit")
-        selected_to_view = st.selectbox(
-            "Select document to view in Verify Workspace",
-            options=[d["docId"] for d in filtered],
-            format_func=lambda did: f"{did[:12]} - {next((d.get('fields', {}).get('vendor') or 'Unknown') for d in filtered if d['docId'] == did)}",
+        st.markdown("#### Open Document in Verification Workspace")
+        doc_select_map = {
+            d["docId"]: f"📄 {d.get('fields', {}).get('invoiceNumber') or 'Unnamed'} | {d.get('fields', {}).get('vendor') or 'Unknown'} (${float(d.get('fields', {}).get('total', 0.0) or 0.0):,.2f})"
+            for d in paged_docs
+        }
+        chosen_view_id = st.selectbox(
+            "Select Document to Open",
+            options=list(doc_select_map.keys()),
+            format_func=lambda x: doc_select_map[x],
+            key="history_open_doc",
         )
-        if st.button("Open in Verify Workspace"):
-            st.session_state["selected_doc_id"] = selected_to_view
-            st.session_state["nav_page"] = "Verify Documents"
+        if st.button("🔍 Open in Verification Workspace", type="primary"):
+            st.session_state["selected_doc_id"] = chosen_view_id
+            st.session_state["nav_page"] = "Verification Results"
             st.rerun()
-    else:
-        st.warning("No documents matched the applied filter criteria.")
-

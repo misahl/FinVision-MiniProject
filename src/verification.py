@@ -233,17 +233,19 @@ def verify_tax_calculation(
 
 
 # -------------------------------------------------------------------------
-# Rule 4: Total Sum (subtotal + tax == total)
+# Rule 4: Total Sum (subtotal + tax - discount == total)
 # -------------------------------------------------------------------------
 
 def verify_total_sum(
     subtotal: Optional[Union[Decimal, float, str]],
     tax: Optional[Union[Decimal, float, str]],
     total: Optional[Union[Decimal, float, str]],
+    discount: Optional[Union[Decimal, float, str]] = None,
 ) -> Dict[str, Any]:
-    """Verify that subtotal + tax equals total."""
+    """Verify that subtotal + tax - discount equals total within tolerance."""
     dec_sub = to_decimal(subtotal)
     dec_tax = to_decimal(tax) if tax is not None else Decimal("0.00")
+    dec_disc = to_decimal(discount) if discount is not None else Decimal("0.00")
     dec_tot = to_decimal(total)
 
     if dec_tot is None:
@@ -252,7 +254,7 @@ def verify_total_sum(
             "passed": False,
             "severity": "CRITICAL",
             "message": "Invoice total amount is missing.",
-            "expected": "subtotal + tax",
+            "expected": "subtotal + tax - discount",
             "actual": None,
         }
 
@@ -266,16 +268,17 @@ def verify_total_sum(
             "actual": float(dec_tot),
         }
 
-    expected_total = (dec_sub + dec_tax).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    expected_total = (dec_sub + dec_tax - dec_disc).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
     diff = abs(expected_total - dec_tot)
 
     if diff > TOLERANCE:
+        disc_text = f" - discount ({dec_disc})" if dec_disc > 0 else ""
         return {
             "rule_id": "RULE_TOTAL_SUM",
             "passed": False,
             "severity": "CRITICAL",
             "message": (
-                f"Total mismatch: subtotal ({dec_sub}) + tax ({dec_tax}) = {expected_total}, "
+                f"Total mismatch: subtotal ({dec_sub}) + tax ({dec_tax}){disc_text} = {expected_total}, "
                 f"but stated total is {dec_tot} (diff: {diff})."
             ),
             "expected": float(expected_total),
@@ -286,9 +289,73 @@ def verify_total_sum(
         "rule_id": "RULE_TOTAL_SUM",
         "passed": True,
         "severity": "INFO",
-        "message": f"Stated total ({dec_tot}) matches subtotal + tax ({expected_total}) within tolerance.",
+        "message": f"Stated total ({dec_tot}) matches subtotal + tax - discount ({expected_total}) within tolerance.",
         "expected": float(expected_total),
         "actual": float(dec_tot),
+    }
+
+
+# -------------------------------------------------------------------------
+# Rule 4b: Non-Negative Total (total >= 0.00)
+# -------------------------------------------------------------------------
+
+def verify_total_non_negative(total: Optional[Union[Decimal, float, str]]) -> Dict[str, Any]:
+    """Verify that stated total is non-negative."""
+    dec_tot = to_decimal(total)
+    if dec_tot is None:
+        return {
+            "rule_id": "RULE_TOTAL_NON_NEGATIVE",
+            "passed": False,
+            "severity": "CRITICAL",
+            "message": "Invoice total amount is missing or invalid.",
+            "expected": ">= 0.00",
+            "actual": None,
+        }
+
+    if dec_tot < Decimal("0.00"):
+        return {
+            "rule_id": "RULE_TOTAL_NON_NEGATIVE",
+            "passed": False,
+            "severity": "CRITICAL",
+            "message": f"Invoice total must be non-negative, but got {dec_tot}.",
+            "expected": ">= 0.00",
+            "actual": float(dec_tot),
+        }
+
+    return {
+        "rule_id": "RULE_TOTAL_NON_NEGATIVE",
+        "passed": True,
+        "severity": "INFO",
+        "message": f"Total amount ({dec_tot}) is positive and valid.",
+        "expected": ">= 0.00",
+        "actual": float(dec_tot),
+    }
+
+
+# -------------------------------------------------------------------------
+# Rule 4c: Required Vendor Details Present
+# -------------------------------------------------------------------------
+
+def verify_vendor_details(fields: Dict[str, Any]) -> Dict[str, Any]:
+    """Verify vendor details are identifiable and not placeholder strings."""
+    vendor = fields.get("vendor")
+    if not vendor or str(vendor).strip() == "" or str(vendor).strip().lower() in ["unknown", "n/a", "none"]:
+        return {
+            "rule_id": "RULE_VENDOR_DETAILS",
+            "passed": False,
+            "severity": "WARNING",
+            "message": "Vendor identification is missing or indeterminate.",
+            "expected": "Valid vendor name",
+            "actual": vendor or "None",
+        }
+
+    return {
+        "rule_id": "RULE_VENDOR_DETAILS",
+        "passed": True,
+        "severity": "INFO",
+        "message": f"Vendor identified: '{vendor}'.",
+        "expected": "Valid vendor name",
+        "actual": vendor,
     }
 
 
@@ -502,14 +569,21 @@ def run_verification_rules(
         )
     )
 
-    # 4. Total sum
+    # 4. Total sum (subtotal + tax - discount == total)
     rule_results.append(
         verify_total_sum(
             fields.get("subtotal"),
             fields.get("tax"),
             fields.get("total"),
+            fields.get("discount"),
         )
     )
+
+    # 4b. Non-negative total
+    rule_results.append(verify_total_non_negative(fields.get("total")))
+
+    # 4c. Vendor details identified
+    rule_results.append(verify_vendor_details(fields))
 
     # 5. Required fields
     req_res, missing_fields = verify_required_fields(fields)

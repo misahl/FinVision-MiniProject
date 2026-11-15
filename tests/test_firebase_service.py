@@ -113,3 +113,32 @@ def test_storage_upload_and_download():
     downloaded = download_invoice_bytes(path)
     assert downloaded == raw_payload
 
+
+def test_admin_user_management_and_authorization():
+    """Verify admin role management and backend authorization enforcement."""
+    from src.firebase_service import list_users, update_user_role, list_audit_logs, get_system_health
+
+    # 1. Register users
+    analyst = sign_up_user("analyst1@test.com", "Password123!", "Analyst One", "analyst")
+    admin = sign_up_user("admin1@test.com", "AdminPassword123!", "Admin One", "admin")
+
+    users = list_users()
+    assert len(users) >= 2
+
+    # 2. Non-admin cannot modify roles
+    with pytest.raises(PermissionError, match="Access Denied"):
+        update_user_role(analyst["localId"], "admin", admin_user={"role": "analyst", "uid": analyst["localId"]})
+
+    # 3. Admin can update role
+    res = update_user_role(analyst["localId"], "admin", admin_user={"role": "admin", "uid": admin["localId"]})
+    assert res is True
+
+    # 4. Audit logs are written
+    logs = list_audit_logs()
+    assert any(log.get("action") == "USER_ROLE_UPDATED" for log in logs)
+
+    # 5. System health check
+    health = get_system_health()
+    assert health["status"] == "healthy"
+
+

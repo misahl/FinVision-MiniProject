@@ -198,18 +198,18 @@ def generate_pdf_report(doc: Dict[str, Any]) -> bytes:
 
 def render_reports(user: dict):
     """Render PDF report generation and download interface."""
-    st.markdown("## Official Verification Audit Reports (PDF)")
-    st.markdown("Generate and download compliance-ready PDF verification reports with full rule traces and legal disclaimers.")
+    st.markdown("## 📑 Official Verification Audit Reports (PDF)")
+    st.caption("Generate and download enterprise compliance-ready PDF verification reports with full rule traces, forensic findings, and audit sign-offs.")
 
     owner_uid = None if user.get("role") == "admin" else user.get("uid")
-    docs = firebase_service.list_documents(owner_uid=owner_uid, limit=50)
+    docs = firebase_service.list_documents(owner_uid=owner_uid, limit=100)
 
     if not docs:
         st.info("No documents in repository to generate reports for.")
         return
 
     doc_options = {
-        d["docId"]: f"{d.get('fields', {}).get('invoiceNumber') or 'Unnamed'} ({d['docId'][:10]}) - {d.get('fields', {}).get('vendor') or 'Unknown'}"
+        d["docId"]: f"📄 {d.get('fields', {}).get('invoiceNumber') or 'Unnamed'} | {d.get('fields', {}).get('vendor') or 'Unknown'} (${float(d.get('fields', {}).get('total', 0.0) or 0.0):,.2f}) — {d.get('risk', {}).get('level', 'LOW')}"
         for d in docs
     }
 
@@ -224,11 +224,26 @@ def render_reports(user: dict):
         st.error("Document not found.")
         return
 
-    st.markdown("### Document Summary")
-    st.write(f"**Invoice #:** {doc.get('fields', {}).get('invoiceNumber') or 'N/A'}")
-    st.write(f"**Vendor:** {doc.get('fields', {}).get('vendor') or 'N/A'}")
-    st.write(f"**Stated Total:** ${float(doc.get('fields', {}).get('total', 0.0)):,.2f}" if doc.get('fields', {}).get('total') else "**Stated Total:** N/A")
-    st.write(f"**Risk Level:** {doc.get('risk', {}).get('level', 'LOW')}")
+    fields = doc.get("fields", {})
+    risk = doc.get("risk", {})
+
+    st.markdown(
+        f"""
+        <div class="fin-card">
+            <div style="display: grid; grid-template-columns: 140px 1fr 140px 1fr; row-gap: 10px; font-size: 0.9rem;">
+                <div style="font-weight: 600; color: #64748B;">Invoice #:</div>
+                <div style="font-weight: 700; color: #0F172A;">{fields.get('invoiceNumber') or 'N/A'}</div>
+                <div style="font-weight: 600; color: #64748B;">Risk Rating:</div>
+                <div><b>{risk.get('level', 'LOW')} ({risk.get('score', 0):.0f}/100)</b></div>
+                <div style="font-weight: 600; color: #64748B;">Vendor:</div>
+                <div style="color: #0F172A;">{fields.get('vendor') or 'N/A'}</div>
+                <div style="font-weight: 600; color: #64748B;">Stated Total:</div>
+                <div style="font-weight: 700; color: #0F172A;">${float(fields.get('total', 0.0) or 0.0):,.2f}</div>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
     if st.button("📄 Generate Compliance PDF Report", type="primary"):
         with st.spinner("Compiling ReportLab flowables, styling, and audit tables..."):
@@ -240,7 +255,7 @@ def render_reports(user: dict):
                 user.get("uid", "anonymous"), doc["docId"], report_filename, pdf_bytes, "application/pdf"
             )
 
-            st.success("PDF Report generated successfully!")
+            st.success("✓ Official PDF Report compiled successfully!")
             st.download_button(
                 label="⬇️ Download PDF Audit Report",
                 data=pdf_bytes,

@@ -1,6 +1,7 @@
-"""Document Verification & Review Workspace for FinVision."""
+"""Verification Results & Review Workspace for FinVision."""
 
 from decimal import Decimal
+import io
 import streamlit as st
 from PIL import Image
 
@@ -10,17 +11,17 @@ from src import firebase_service, verification, risk_assessment
 
 def render_verify(user: dict):
     """Render interactive document verification, editable field audit, and human decision workspace."""
-    st.markdown("## Document Audit & Verification Workspace")
-    st.caption("Inspect document scans, review extracted financial fields, inspect deterministic rule outcomes, and submit formal reviewer sign-off.")
+    st.markdown("## 🛡️ Document Verification & Audit Workspace")
+    st.caption("Inspect document scans, verify deterministic mathematical checks, review ML probability insights, and submit formal reviewer decisions.")
 
     owner_uid = None if user.get("role") == "admin" else user.get("uid")
-    docs = firebase_service.list_documents(owner_uid=owner_uid, limit=50)
+    docs = firebase_service.list_documents(owner_uid=owner_uid, limit=100)
 
     if not docs:
         st.info("No documents available for verification. Please upload an invoice first.")
         return
 
-    # Select document to verify
+    # Select document from audit queue
     doc_options = {
         d["docId"]: f"📄 {d.get('fields', {}).get('invoiceNumber') or 'Unnamed'} | {d.get('fields', {}).get('vendor') or 'Unknown'} (${float(d.get('fields', {}).get('total', 0.0) or 0.0):,.2f}) — {d.get('risk', {}).get('level', 'NEW')}"
         for d in docs
@@ -48,10 +49,11 @@ def render_verify(user: dict):
     risk = doc.get("risk", {})
     verif = doc.get("verification", {})
     ml = doc.get("ml", {})
+    cv = doc.get("cv", {})
     file_info = doc.get("file", {})
     review = doc.get("review") or {}
 
-    # 1. Top Executive Status Bar (Card Grid)
+    # 1. Top Executive Status Bar
     st.markdown("<div style='margin-top: 8px; margin-bottom: 16px;'>", unsafe_allow_html=True)
     b1, b2, b3, b4 = st.columns(4)
     with b1:
@@ -76,7 +78,7 @@ def render_verify(user: dict):
         )
     with b3:
         dec = review.get("decision") or "unreviewed"
-        dec_color = "#10B981" if dec == "approved" else ("#EF4444" if dec == "rejected" else "#F59E0B")
+        dec_color = "#10B981" if dec == "approved" else ("#EF4444" if dec in ["rejected", "flagged"] else "#F59E0B")
         st.markdown(
             f"""
             <div class="fin-card" style="padding: 14px 18px; margin-bottom: 0;">
@@ -98,221 +100,161 @@ def render_verify(user: dict):
         )
     st.markdown("</div>", unsafe_allow_html=True)
 
-    # 2. Main Work Area: Scan Preview (Left) vs Editable Form (Right)
-    col_left, col_right = st.columns([1, 1.25])
+    # 2. Main Two-Column Layout (Scan Preview vs Verification Details)
+    col_scan, col_details = st.columns([1, 1.25])
 
-    with col_left:
-        st.markdown("### Document Scan")
+    with col_scan:
+        st.markdown("### 📄 Original Document")
         storage_path = file_info.get("storagePath")
-        scan_rendered = False
-
         if storage_path:
             img_bytes = firebase_service.download_invoice_bytes(storage_path)
             if img_bytes:
                 try:
-                    from src.image_processing import load_image_from_source
-                    img_bgr, _ = load_image_from_source(img_bytes)
-                    st.image(img_bgr, caption=f"Original File: {file_info.get('mimeType', 'Document')}", use_container_width=True)
-                    scan_rendered = True
+                    pil_img = Image.open(io.BytesIO(img_bytes))
+                    st.image(pil_img, caption=file_info.get("filename", "Invoice Scan"), use_container_width=True)
                 except Exception:
-                    pass
+                    st.info(f"File: {file_info.get('filename')} ({len(img_bytes)} bytes)")
+            else:
+                st.caption("File preview unavailable from storage.")
+        else:
+            st.caption("No storage path associated with record.")
 
-        if not scan_rendered:
+        # Document metadata
+        st.markdown(
+            f"""
+            <div style="background-color: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 8px; padding: 12px; margin-top: 10px; font-size: 0.82rem; color: #475569;">
+                <div><b>Filename:</b> {file_info.get('filename', 'N/A')}</div>
+                <div><b>SHA-256:</b> <span style="font-family: monospace;">{file_info.get('sha256', 'N/A')[:20]}...</span></div>
+                <div><b>pHash:</b> <span style="font-family: monospace;">{file_info.get('pHash', 'N/A')}</span></div>
+                <div><b>Created:</b> {doc.get('createdAt', 'N/A')}</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    with col_details:
+        st.markdown("### 🔍 Verification Findings")
+        tab_rules, tab_fields, tab_dup, tab_ai, tab_review = st.tabs([
+            "Rule Engine",
+            "Extracted Data",
+            "Duplicates",
+            "ML & CV Analysis",
+            "Reviewer Sign-Off",
+        ])
+
+        # ---------------------------------------------------------
+        # Tab 1: Deterministic Rules
+        # ---------------------------------------------------------
+        with tab_rules:
+            st.markdown("#### Deterministic Financial Invariants")
+            rule_results = verif.get("ruleResults", [])
+            if rule_results:
+                for r in rule_results:
+                    render_rule_card(r)
+            else:
+                st.info("No validation outcomes recorded.")
+
+            st.markdown("#### Risk Assessment Drivers")
+            for reason in risk.get("reasons", []):
+                st.markdown(f"- {reason}")
+
+        # ---------------------------------------------------------
+        # Tab 2: Extracted Data & Confidence
+        # ---------------------------------------------------------
+        with tab_fields:
+            st.markdown("#### Extracted Header Fields")
+            h_col1, h_col2 = st.columns(2)
+            with h_col1:
+                st.text_input("Invoice Number", value=fields.get("invoiceNumber", "N/A"), disabled=True, key="v_inv")
+                st.text_input("Vendor", value=fields.get("vendor", "N/A"), disabled=True, key="v_vend")
+                st.text_input("Invoice Date", value=fields.get("date", "N/A"), disabled=True, key="v_date")
+                st.text_input("Due Date", value=fields.get("dueDate", "N/A"), disabled=True, key="v_due")
+            with h_col2:
+                st.text_input("Subtotal", value=f"${float(fields.get('subtotal', 0.0) or 0.0):,.2f}", disabled=True, key="v_sub")
+                st.text_input("Tax / VAT", value=f"${float(fields.get('tax', 0.0) or 0.0):,.2f}", disabled=True, key="v_tax")
+                st.text_input("Discount", value=f"${float(fields.get('discount', 0.0) or 0.0):,.2f}", disabled=True, key="v_disc")
+                st.text_input("Total", value=f"${float(fields.get('total', 0.0) or 0.0):,.2f}", disabled=True, key="v_tot")
+
+            # Line items table
+            line_items = doc.get("lineItems", [])
+            if line_items:
+                st.markdown("#### Itemized Line Items")
+                st.dataframe(line_items, use_container_width=True)
+
+        # ---------------------------------------------------------
+        # Tab 3: Duplicate Collisions
+        # ---------------------------------------------------------
+        with tab_dup:
+            dup_matches = verif.get("duplicateMatches", [])
+            if dup_matches:
+                st.warning(f"⚠️ {len(dup_matches)} Duplicate Collision(s) Detected:")
+                for m in dup_matches:
+                    st.markdown(f"- **{m.get('matchType')}** (Similarity: `{m.get('similarityScore', 100)}%`): {m.get('reason')}")
+            else:
+                st.success("✓ No duplicate matches detected for this invoice.")
+
+        # ---------------------------------------------------------
+        # Tab 4: Machine Learning & Computer Vision
+        # ---------------------------------------------------------
+        with tab_ai:
+            st.markdown("#### Machine Learning Classifier (Experimental)")
+            ml_pred = ml.get("prediction", 0)
+            ml_prob = ml.get("probability", 0.0)
+            verdict = ml.get("verdict", "normal")
+
             st.markdown(
-                """
-                <div style="background: #FFFFFF; border: 2px dashed #CBD5E1; border-radius: 12px; padding: 40px 20px; text-align: center; color: #64748B;">
-                    <div style="font-size: 2rem; margin-bottom: 8px;">📑</div>
-                    <div style="font-weight: 600; color: #1E293B; margin-bottom: 4px;">Original Scan Asset</div>
-                    <div style="font-size: 0.85rem;">Document record verified via metadata & OCR pipeline.</div>
+                f"""
+                <div style="background-color: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 8px; padding: 14px; margin-bottom: 12px;">
+                    <div><b>Model Verdict:</b> <span style="font-weight: 700; color: {'#EF4444' if verdict == 'suspicious' else '#10B981'};">{verdict.upper()}</span></div>
+                    <div><b>Suspiciousness Probability:</b> {ml_prob * 100:.1f}%</div>
+                    <div><b>Model Registry:</b> {ml.get('modelVersion', 'v1.0.0')} (Random Forest Baseline)</div>
                 </div>
                 """,
                 unsafe_allow_html=True,
             )
 
-        # Cryptographic file fingerprint card
-        st.markdown("<br/>", unsafe_allow_html=True)
-        st.markdown(
-            f"""
-            <div class="fin-card" style="padding: 12px 16px;">
-                <div style="font-size: 0.78rem; font-weight: 600; color: #64748B; margin-bottom: 4px;">DIGITAL FINGERPRINT</div>
-                <div style="font-family: monospace; font-size: 0.75rem; color: #334155; word-break: break-all;">
-                    <b>SHA-256:</b> {file_info.get('sha256', 'N/A')}<br/>
-                    <b>pHash:</b> {file_info.get('pHash', 'N/A')}
-                </div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
+            st.markdown("#### Computer Vision Forensic Indicators")
+            cv_score = cv.get("cvScore", 0.0)
+            st.markdown(f"- **Visual Anomaly Score:** `{cv_score:.1f}/100`")
+            for ind in cv.get("indicators", []):
+                st.markdown(f"- **{ind.get('indicator')}:** {ind.get('details')} (score: `{ind.get('score', 0):.0f}`)")
 
-    with col_right:
-        st.markdown("### Extracted Financial Fields")
-        st.caption("Review extracted values. Fields with confidence < 80% indicate potential visual or OCR ambiguity.")
+        # ---------------------------------------------------------
+        # Tab 5: Reviewer Sign-Off & Audit History
+        # ---------------------------------------------------------
+        with tab_review:
+            st.markdown("#### Analyst Audit Sign-Off")
+            st.caption("Submit formal review decision for this financial document record.")
 
-        with st.form("edit_fields_form"):
-            col_f1, col_f2 = st.columns(2)
-            with col_f1:
-                conf_inv = confidences.get("invoiceNumber", 0.0)
-                inv_num_val = st.text_input(
-                    f"Invoice Number (Conf: {conf_inv:.0f}%)",
-                    value=fields.get("invoiceNumber") or "",
+            current_decision = review.get("decision")
+            if current_decision:
+                st.info(f"Current Decision: **{current_decision.upper()}** by `{review.get('reviewerUid', 'Analyst')}` on {review.get('reviewedAt', 'N/A')}")
+                if review.get("comment"):
+                    st.markdown(f"**Reviewer Notes:** {review.get('comment')}")
+
+            with st.form("reviewer_decision_form"):
+                decision_choice = st.selectbox(
+                    "Review Decision",
+                    options=["approved", "rejected", "flagged", "needs_review"],
+                    format_func=lambda x: {
+                        "approved": "Approve Document (Straight-Through)",
+                        "rejected": "Reject Document (Discrepancy Confirmed)",
+                        "flagged": "Flag for Investigation (Suspicious)",
+                        "needs_review": "Request Additional Requisition Details",
+                    }[x],
                 )
-                conf_date = confidences.get("date", 0.0)
-                date_val = st.text_input(
-                    f"Invoice Date (Conf: {conf_date:.0f}%)",
-                    value=fields.get("date") or "",
-                )
-                conf_sub = confidences.get("subtotal", 0.0)
-                subtotal_val = st.number_input(
-                    f"Subtotal $ (Conf: {conf_sub:.0f}%)",
-                    value=float(fields.get("subtotal") or 0.0),
-                    step=0.01,
-                )
+                reviewer_notes = st.text_area("Audit Notes & Justification", value=review.get("comment", ""), placeholder="Enter formal review notes...")
+                submit_decision = st.form_submit_button("Submit Formal Decision", type="primary", use_container_width=True)
 
-            with col_f2:
-                conf_vend = confidences.get("vendor", 0.0)
-                vendor_val = st.text_input(
-                    f"Vendor (Conf: {conf_vend:.0f}%)",
-                    value=fields.get("vendor") or "",
-                )
-                conf_cust = confidences.get("customer", 0.0)
-                cust_val = st.text_input(
-                    f"Customer (Conf: {conf_cust:.0f}%)",
-                    value=fields.get("customer") or "",
-                )
-                conf_tax = confidences.get("tax", 0.0)
-                tax_val = st.number_input(
-                    f"Tax Amount $ (Conf: {conf_tax:.0f}%)",
-                    value=float(fields.get("tax") or 0.0),
-                    step=0.01,
-                )
-
-            conf_tot = confidences.get("total", 0.0)
-            total_val = st.number_input(
-                f"Total Stated Amount $ (Conf: {conf_tot:.0f}%)",
-                value=float(fields.get("total") or 0.0),
-                step=0.01,
-            )
-
-            save_corrections = st.form_submit_button("💾 Save Field Corrections & Re-verify", type="primary", use_container_width=True)
-            if save_corrections:
-                updated_fields = {
-                    "invoiceNumber": inv_num_val,
-                    "date": date_val,
-                    "vendor": vendor_val,
-                    "customer": cust_val,
-                    "subtotal": subtotal_val,
-                    "tax": tax_val,
-                    "taxRate": round(tax_val / subtotal_val, 2) if subtotal_val > 0 else 0.10,
-                    "total": total_val,
-                    "currency": fields.get("currency", "USD"),
-                }
-
-                # Re-run rule engine and risk assessment on corrected values
-                new_verif = verification.run_verification_rules(updated_fields, doc.get("lineItems", []))
-                new_risk = risk_assessment.compute_document_risk(new_verif, ml_results=ml)
-
-                # Persist updates
-                firebase_service.save_document_analysis(
-                    chosen_id,
-                    updated_fields,
-                    confidences,
-                    doc.get("lineItems", []),
-                    new_verif,
-                    {"cvScore": verif.get("cvScore", 0.0), "cvRegions": verif.get("cvRegions", [])},
-                    ml,
-                    new_risk,
-                )
-                st.success("Field corrections persisted! Verification rules and risk assessment updated.")
-                st.rerun()
-
-    # 3. Diagnostic Tabs
-    st.markdown("---")
-    tab_rules, tab_cv, tab_ml, tab_risk, tab_decision = st.tabs([
-        "Deterministic Rules",
-        "Computer Vision Diagnostics",
-        "Machine Learning Inference",
-        "Risk Drivers & Actions",
-        "Reviewer Decision Sign-Off",
-    ])
-
-    with tab_rules:
-        st.markdown("### Deterministic Rule Engine Verification")
-        st.caption("Pure mathematical & business logic checks evaluated with exact Decimal arithmetic.")
-        rule_list = verif.get("ruleResults", [])
-        if rule_list:
-            for r in rule_list:
-                render_rule_card(r)
-        else:
-            st.info("No rule results recorded for this document.")
-
-    with tab_cv:
-        st.markdown("### Explainable Computer Vision Indicators")
-        st.caption("Heuristic image forensics. These indicators are advisory checks and do not prove tampering.")
-        cv_score = verif.get("cvScore", 0.0)
-        c_v1, c_v2 = st.columns(2)
-        with c_v1:
-            st.metric("Composite CV Anomaly Score", f"{cv_score:.1f} / 100")
-        with c_v2:
-            regions = verif.get("cvRegions", [])
-            st.metric("Flagged Outlier Clusters", f"{len(regions)} region(s)")
-
-    with tab_ml:
-        st.markdown("### Statistical Suspiciousness Classifier")
-        st.caption("Random Forest model trained on documented, reproducible synthetic perturbations.")
-        c_m1, c_m2, c_m3 = st.columns(3)
-        with c_m1:
-            st.metric("Model Version", ml.get("modelVersion", "v1.0.0"))
-        with c_m2:
-            st.metric("Model Status", "Experimental (Advisory)")
-        with c_m3:
-            st.metric("Probability of Suspiciousness", f"{ml.get('probability', 0.0)*100:.1f}%")
-
-    with tab_risk:
-        st.markdown("### Risk Evaluation Summary")
-        st.markdown(
-            f"""
-            <div class="fin-card">
-                <div style="font-weight: 700; font-size: 1.1rem; color: #0F172A; margin-bottom: 6px;">
-                    Overall Risk Rating: {render_risk_badge(risk.get('level', 'LOW'), risk.get('score', 0))}
-                </div>
-                <div style="font-size: 0.9rem; color: #475569; margin-bottom: 12px;">
-                    <b>Recommended Operational Action:</b><br/>{risk.get('recommendedAction', 'Standard manual review required.')}
-                </div>
-                <div style="font-weight: 600; font-size: 0.88rem; color: #1E293B; margin-bottom: 4px;">Identified Variance Drivers:</div>
-                <ul style="color: #475569; font-size: 0.88rem; margin-top: 0;">
-                    {''.join(f'<li>{reason}</li>' for reason in risk.get('reasons', []))}
-                </ul>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-
-    with tab_decision:
-        st.markdown("### Human Reviewer Audit Sign-Off")
-        st.caption("Formal auditor sign-off. The decision is committed with server timestamp to an append-only audit trail.")
-
-        current_comment = review.get("comment", "")
-        reviewer_comment = st.text_area("Audit Justification / Reviewer Notes", value=current_comment, placeholder="Enter any notes or justification for this decision...")
-
-        col_d1, col_d2, col_d3 = st.columns(3)
-        with col_d1:
-            if st.button("✅ Approve Document", type="primary", use_container_width=True):
-                firebase_service.update_document_review_decision(
-                    chosen_id, user.get("uid", "anonymous"), "approved", reviewer_comment
-                )
-                st.success("Document approved and audit trail updated.")
-                st.rerun()
-        with col_d2:
-            if st.button("❌ Reject Document", use_container_width=True):
-                firebase_service.update_document_review_decision(
-                    chosen_id, user.get("uid", "anonymous"), "rejected", reviewer_comment
-                )
-                st.error("Document rejected and audit trail updated.")
-                st.rerun()
-        with col_d3:
-            if st.button("⚠️ Flag for Secondary Review", use_container_width=True):
-                firebase_service.update_document_review_decision(
-                    chosen_id, user.get("uid", "anonymous"), "needs_review", reviewer_comment
-                )
-                st.warning("Document flagged for secondary review.")
-                st.rerun()
+                if submit_decision:
+                    try:
+                        firebase_service.update_document_review_decision(
+                            doc_id=chosen_id,
+                            reviewer_uid=user.get("uid", "anonymous"),
+                            decision=decision_choice,
+                            comment=reviewer_notes,
+                        )
+                        st.success(f"✓ Decision '{decision_choice.upper()}' recorded in audit trail!")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Failed to record decision: {e}")

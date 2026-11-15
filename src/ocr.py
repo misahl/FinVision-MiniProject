@@ -71,12 +71,14 @@ class LineItem:
 class ExtractedInvoice:
     invoice_number: Optional[str] = None
     invoice_date: Optional[str] = None
+    due_date: Optional[str] = None
     vendor: Optional[str] = None
     customer: Optional[str] = None
     currency: str = "USD"
     subtotal: Optional[Decimal] = None
     tax: Optional[Decimal] = None
     tax_rate: Optional[Decimal] = None
+    discount: Optional[Decimal] = None
     total: Optional[Decimal] = None
     line_items: List[LineItem] = field(default_factory=list)
     field_confidence: Dict[str, float] = field(default_factory=dict)
@@ -92,10 +94,12 @@ class ExtractedInvoice:
                 "vendor": self.vendor,
                 "customer": self.customer,
                 "date": self.invoice_date,
+                "dueDate": self.due_date,
                 "currency": self.currency,
                 "subtotal": float(self.subtotal) if self.subtotal is not None else None,
                 "tax": float(self.tax) if self.tax is not None else None,
                 "taxRate": float(self.tax_rate) if self.tax_rate is not None else None,
+                "discount": float(self.discount) if self.discount is not None else 0.0,
                 "total": float(self.total) if self.total is not None else None,
             },
             "fieldConfidence": self.field_confidence,
@@ -351,6 +355,20 @@ def extract_invoice_fields(
                 )
                 break
 
+    # 2b. Due Date Heuristic:
+    due_date_patterns = [
+        r"(?:Due\s*Date|Payment\s*Due|Pay\s*By|Due\s*By)[:\s]*([0-9]{1,4}[/\-\.][0-9]{1,2}[/\-\.][0-9]{1,4})",
+    ]
+    for pattern in due_date_patterns:
+        m = re.search(pattern, full_text, re.IGNORECASE)
+        if m:
+            raw_d = m.group(1).strip()
+            std_d = standardize_date(raw_d)
+            if std_d:
+                inv.due_date = std_d
+                inv.field_confidence["dueDate"] = round(overall_conf, 2)
+                break
+
     # 3. Vendor & Customer Heuristic (Multi-column aware):
     # Many invoices have side-by-side 'Seller:' and 'Client:' or 'Bill To:'
     for i, line_str in enumerate(line_strings):
@@ -445,6 +463,15 @@ def extract_invoice_fields(
                 if val is not None:
                     inv.subtotal = val
                     inv.field_confidence["subtotal"] = round(float(np.mean([w["conf"] for w in line])), 2)
+
+        # Standalone Discount
+        if inv.discount is None and any(k in line_txt.lower() for k in ["discount", "less discount", "rebate"]):
+            amt = re.findall(money_pat, line_txt)
+            if amt:
+                val = parse_decimal_amount(amt[-1])
+                if val is not None:
+                    inv.discount = val
+                    inv.field_confidence["discount"] = round(float(np.mean([w["conf"] for w in line])), 2)
 
         # Standalone Tax / VAT
         if inv.tax is None and any(k in line_txt.lower() for k in ["tax", "vat", "gst"]):

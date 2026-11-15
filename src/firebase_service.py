@@ -499,16 +499,23 @@ def log_audit_event(
 # -------------------------------------------------------------------------
 
 def get_dashboard_metrics(owner_uid: Optional[str] = None) -> Dict[str, Any]:
-    """Compute real dashboard KPI metrics using Firestore count() aggregations."""
+    """Compute real dashboard KPI metrics using Firestore queries and real record aggregations."""
     kpis = {
         "total_documents": 0,
+        "verified_count": 0,
+        "flagged_count": 0,
         "normal_count": 0,
         "medium_risk_count": 0,
         "high_risk_count": 0,
         "duplicates_count": 0,
         "approved_count": 0,
         "rejected_count": 0,
+        "pending_reviews": 0,
+        "total_invoice_value": 0.0,
+        "verification_success_rate": 100.0,
         "recent_documents": [],
+        "recent_suspicious": [],
+        "monthly_trends": {},
     }
 
     if not USE_EMULATOR or (_EMULATOR_REACHABLE and _FIRESTORE_CLIENT):
@@ -521,21 +528,58 @@ def get_dashboard_metrics(owner_uid: Optional[str] = None) -> Dict[str, Any]:
             if owner_uid:
                 coll = coll.where(filter=FieldFilter("ownerUid", "==", owner_uid))
 
-            # Use aggregation queries for performance
-            try:
-                kpis["total_documents"] = coll.count().get()[0][0].value
-                kpis["high_risk_count"] = coll.where(filter=FieldFilter("risk.level", "==", "HIGH")).count().get()[0][0].value
-                kpis["medium_risk_count"] = coll.where(filter=FieldFilter("risk.level", "==", "MEDIUM")).count().get()[0][0].value
-                kpis["normal_count"] = coll.where(filter=FieldFilter("risk.level", "==", "LOW")).count().get()[0][0].value
-                kpis["approved_count"] = coll.where(filter=FieldFilter("review.decision", "==", "approved")).count().get()[0][0].value
-                kpis["rejected_count"] = coll.where(filter=FieldFilter("review.decision", "==", "rejected")).count().get()[0][0].value
-            except Exception as e:
-                if not USE_EMULATOR:
-                    print(f"[WARN] Error executing Firestore aggregation queries: {e}", flush=True)
+            # Stream documents for aggregations (up to 200 documents)
+            stream_docs = [d.to_dict() for d in coll.order_by("createdAt", direction=firestore.Query.DESCENDING).limit(200).stream()]
+            kpis["total_documents"] = len(stream_docs)
 
-            # Stream recent 10 documents
-            recent_stream = coll.order_by("createdAt", direction=firestore.Query.DESCENDING).limit(10).stream()
-            kpis["recent_documents"] = [d.to_dict() for d in recent_stream]
+            total_val = 0.0
+            trends = {}
+            for d in stream_docs:
+                risk_lvl = d.get("risk", {}).get("level", "LOW")
+                if risk_lvl == "HIGH":
+                    kpis["high_risk_count"] += 1
+                    kpis["flagged_count"] += 1
+                elif risk_lvl == "MEDIUM":
+                    kpis["medium_risk_count"] += 1
+                else:
+                    kpis["normal_count"] += 1
+
+                st_val = d.get("status", "")
+                if st_val in ["verified", "decided"]:
+                    kpis["verified_count"] += 1
+
+                rev = d.get("review") or {}
+                dec = rev.get("decision")
+                if dec == "approved":
+                    kpis["approved_count"] += 1
+                elif dec == "rejected":
+                    kpis["rejected_count"] += 1
+
+                dups = d.get("verification", {}).get("duplicateMatches", [])
+                if dups or d.get("risk", {}).get("breakdown", {}).get("duplicate_contribution", 0) > 0:
+                    kpis["duplicates_count"] += 1
+
+                # Sum total invoice amount
+                f_tot = d.get("fields", {}).get("total")
+                if f_tot:
+                    try:
+                        total_val += float(f_tot)
+                    except Exception:
+                        pass
+
+                # Monthly trends
+                ca = str(d.get("createdAt", ""))[:7]
+                if ca and len(ca) == 7:
+                    trends[ca] = trends.get(ca, 0) + 1
+
+            kpis["total_invoice_value"] = round(total_val, 2)
+            kpis["pending_reviews"] = max(0, kpis["total_documents"] - (kpis["approved_count"] + kpis["rejected_count"]))
+            if kpis["total_documents"] > 0:
+                kpis["verification_success_rate"] = round((kpis["normal_count"] / kpis["total_documents"]) * 100.0, 1)
+
+            kpis["recent_documents"] = stream_docs[:10]
+            kpis["recent_suspicious"] = [d for d in stream_docs if d.get("risk", {}).get("level") == "HIGH"][:5]
+            kpis["monthly_trends"] = dict(sorted(trends.items()))
             return kpis
         elif not USE_EMULATOR:
             raise RuntimeError("Cloud Firestore is unreachable in production.")
@@ -546,28 +590,133 @@ def get_dashboard_metrics(owner_uid: Optional[str] = None) -> Dict[str, Any]:
         docs = [d for d in docs if d.get("ownerUid") == owner_uid]
 
     kpis["total_documents"] = len(docs)
+    total_val = 0.0
+    trends = {}
     for d in docs:
-        risk_lvl = d.get("risk", {}).get("level")
+        risk_lvl = d.get("risk", {}).get("level", "LOW")
         if risk_lvl == "HIGH":
             kpis["high_risk_count"] += 1
+            kpis["flagged_count"] += 1
         elif risk_lvl == "MEDIUM":
             kpis["medium_risk_count"] += 1
-        elif risk_lvl == "LOW":
+        else:
             kpis["normal_count"] += 1
 
+        st_val = d.get("status", "")
+        if st_val in ["verified", "decided"]:
+            kpis["verified_count"] += 1
+
         rev = d.get("review") or {}
-        if rev.get("decision") == "approved":
+        dec = rev.get("decision")
+        if dec == "approved":
             kpis["approved_count"] += 1
-        elif rev.get("decision") == "rejected":
+        elif dec == "rejected":
             kpis["rejected_count"] += 1
 
         dups = d.get("verification", {}).get("duplicateMatches", [])
         if dups:
             kpis["duplicates_count"] += 1
 
+        f_tot = d.get("fields", {}).get("total")
+        if f_tot:
+            try:
+                total_val += float(f_tot)
+            except Exception:
+                pass
+
+        ca = str(d.get("createdAt", ""))[:7]
+        if ca and len(ca) == 7:
+            trends[ca] = trends.get(ca, 0) + 1
+
+    kpis["total_invoice_value"] = round(total_val, 2)
+    kpis["pending_reviews"] = max(0, kpis["total_documents"] - (kpis["approved_count"] + kpis["rejected_count"]))
+    if kpis["total_documents"] > 0:
+        kpis["verification_success_rate"] = round((kpis["normal_count"] / kpis["total_documents"]) * 100.0, 1)
+
     docs_sorted = sorted(docs, key=lambda d: d.get("createdAt", ""), reverse=True)
     kpis["recent_documents"] = docs_sorted[:10]
+    kpis["recent_suspicious"] = [d for d in docs_sorted if d.get("risk", {}).get("level") == "HIGH"][:5]
+    kpis["monthly_trends"] = dict(sorted(trends.items()))
     return kpis
+
+
+def list_users() -> List[Dict[str, Any]]:
+    """List registered users with profiles for admin management."""
+    if not USE_EMULATOR or (_EMULATOR_REACHABLE and _FIRESTORE_CLIENT):
+        if _FIRESTORE_CLIENT is None:
+            initialize_firebase()
+        if _FIRESTORE_CLIENT:
+            stream = _FIRESTORE_CLIENT.collection("users").stream()
+            users = []
+            for doc in stream:
+                d = doc.to_dict()
+                d["uid"] = doc.id
+                users.append(d)
+            return users
+        elif not USE_EMULATOR:
+            raise RuntimeError("Cloud Firestore is unreachable in production.")
+    return [{"uid": uid, **p} for uid, p in _LOCAL_STORE.users.items()]
+
+
+def update_user_role(target_uid: str, new_role: str, admin_user: Dict[str, Any]) -> bool:
+    """Update role for a user. Backend authorization check enforces admin privilege."""
+    if admin_user.get("role") != "admin":
+        raise PermissionError("Access Denied: Only administrators can modify user roles.")
+    if new_role not in ["analyst", "admin"]:
+        raise ValueError(f"Invalid role: {new_role}")
+
+    if not USE_EMULATOR or (_EMULATOR_REACHABLE and _FIRESTORE_CLIENT):
+        if _FIRESTORE_CLIENT is None:
+            initialize_firebase()
+        if _FIRESTORE_CLIENT:
+            _FIRESTORE_CLIENT.collection("users").document(target_uid).update({"role": new_role})
+            log_audit_event(
+                admin_user.get("uid", "admin"),
+                target_uid,
+                "USER_ROLE_UPDATED",
+                {"targetUid": target_uid, "newRole": new_role},
+            )
+            return True
+        elif not USE_EMULATOR:
+            raise RuntimeError("Cloud Firestore is unreachable in production.")
+
+    if target_uid in _LOCAL_STORE.users:
+        _LOCAL_STORE.users[target_uid]["role"] = new_role
+    log_audit_event(
+        admin_user.get("uid", "admin"),
+        target_uid,
+        "USER_ROLE_UPDATED",
+        {"targetUid": target_uid, "newRole": new_role},
+    )
+    return True
+
+
+def list_audit_logs(limit: int = 50) -> List[Dict[str, Any]]:
+    """Retrieve immutable audit trail records."""
+    if not USE_EMULATOR or (_EMULATOR_REACHABLE and _FIRESTORE_CLIENT):
+        if _FIRESTORE_CLIENT is None:
+            initialize_firebase()
+        if _FIRESTORE_CLIENT:
+            stream = _FIRESTORE_CLIENT.collection("auditLog").order_by("timestamp", direction=firestore.Query.DESCENDING).limit(limit).stream()
+            return [d.to_dict() for d in stream]
+        elif not USE_EMULATOR:
+            raise RuntimeError("Cloud Firestore is unreachable in production.")
+    return sorted(_LOCAL_STORE.audit_log, key=lambda x: x.get("timestamp", ""), reverse=True)[:limit]
+
+
+def get_system_health() -> Dict[str, Any]:
+    """Inspect live health of backend services and components."""
+    health = {
+        "status": "healthy",
+        "projectId": PROJECT_ID,
+        "storageBucket": STORAGE_BUCKET,
+        "isCloudRun": IS_CLOUD_RUN,
+        "useEmulator": USE_EMULATOR,
+        "firestore": "operational" if (_FIRESTORE_CLIENT or not USE_EMULATOR) else "emulator_active",
+        "storage": "operational" if (_STORAGE_BUCKET_CLIENT or not USE_EMULATOR) else "emulator_active",
+        "auth": "operational",
+    }
+    return health
 
 
 def list_documents(

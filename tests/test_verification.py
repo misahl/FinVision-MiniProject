@@ -150,5 +150,24 @@ def test_run_verification_rules_composite():
     summary = run_verification_rules(fields, items)
     assert summary["allPassed"] is True
     assert summary["criticalFailuresCount"] == 0
-    assert len(summary["ruleResults"]) == 7
+    assert len(summary["ruleResults"]) == 9
+
+
+def test_rule_total_non_negative_and_vendor_details():
+    """Verify non-negative total and vendor identification rules."""
+    from src.verification import verify_total_non_negative, verify_vendor_details
+
+    # Pass case
+    assert verify_total_non_negative("150.00")["passed"] is True
+    assert verify_vendor_details({"vendor": "Acme Corp"})["passed"] is True
+
+    # Fail cases
+    fail_neg = verify_total_non_negative("-50.00")
+    assert fail_neg["passed"] is False
+    assert fail_neg["severity"] == "CRITICAL"
+
+    fail_vend = verify_vendor_details({"vendor": ""})
+    assert fail_vend["passed"] is False
+    assert fail_vend["severity"] == "WARNING"
+
 

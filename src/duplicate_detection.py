@@ -132,8 +132,17 @@ def find_duplicates(
             matches.append({
                 "docId": cand_id,
                 "matchType": "EXACT_SHA256",
+                "similarityScore": 100.0,
+                "matchingFields": ["sha256", "file_bytes"],
+                "originalUploadDate": cand.get("createdAt", cand_fields.get("date", "Unknown")),
+                "candidateSummary": {
+                    "invoiceNumber": cand_fields.get("invoiceNumber", "N/A"),
+                    "vendor": cand_fields.get("vendor", "N/A"),
+                    "total": cand_fields.get("total", 0.0),
+                    "filename": cand.get("file", {}).get("filename", "N/A"),
+                },
                 "hammingDistance": 0,
-                "reason": f"Exact binary match: identical SHA-256 hash ({target_sha[:12]}...).",
+                "reason": f"Exact binary match: identical cryptographic SHA-256 hash ({target_sha[:12]}...).",
             })
             continue
 
@@ -142,13 +151,23 @@ def find_duplicates(
             try:
                 dist = compute_phash_hamming_distance(target_phash, cand_phash)
                 if dist <= hamming_threshold:
+                    visual_sim = round(max(0.0, 100.0 - (dist / 64.0) * 100.0), 1)
                     matches.append({
                         "docId": cand_id,
                         "matchType": "PERCEPTUAL_PHASH",
+                        "similarityScore": visual_sim,
+                        "matchingFields": ["pHash", "visual_layout"],
+                        "originalUploadDate": cand.get("createdAt", cand_fields.get("date", "Unknown")),
+                        "candidateSummary": {
+                            "invoiceNumber": cand_fields.get("invoiceNumber", "N/A"),
+                            "vendor": cand_fields.get("vendor", "N/A"),
+                            "total": cand_fields.get("total", 0.0),
+                            "filename": cand.get("file", {}).get("filename", "N/A"),
+                        },
                         "hammingDistance": dist,
                         "reason": (
-                            f"Near-exact visual match: perceptual pHash Hamming distance is {dist} "
-                            f"(threshold: <= {hamming_threshold}). Indicates identical or slightly modified scan."
+                            f"Near-exact visual match: perceptual pHash Hamming distance is {dist}/64 "
+                            f"({visual_sim}% visual layout similarity). Indicates identical or slightly rescanned document."
                         ),
                     })
                     continue
@@ -163,6 +182,15 @@ def find_duplicates(
                 matches.append({
                     "docId": cand_id,
                     "matchType": "SEMANTIC_INVOICE_VENDOR",
+                    "similarityScore": 95.0,
+                    "matchingFields": ["invoiceNumber", "vendor"],
+                    "originalUploadDate": cand.get("createdAt", cand_fields.get("date", "Unknown")),
+                    "candidateSummary": {
+                        "invoiceNumber": cand_fields.get("invoiceNumber", "N/A"),
+                        "vendor": cand_fields.get("vendor", "N/A"),
+                        "total": cand_fields.get("total", 0.0),
+                        "filename": cand.get("file", {}).get("filename", "N/A"),
+                    },
                     "hammingDistance": None,
                     "reason": f"Semantic duplicate: identical invoice number ('{t_inv_num}') and vendor ('{t_vendor}').",
                 })
@@ -180,6 +208,15 @@ def find_duplicates(
                 matches.append({
                     "docId": cand_id,
                     "matchType": "SEMANTIC_VENDOR_DATE_TOTAL",
+                    "similarityScore": 90.0,
+                    "matchingFields": ["vendor", "date", "total"],
+                    "originalUploadDate": cand.get("createdAt", cand_fields.get("date", "Unknown")),
+                    "candidateSummary": {
+                        "invoiceNumber": cand_fields.get("invoiceNumber", "N/A"),
+                        "vendor": cand_fields.get("vendor", "N/A"),
+                        "total": cand_fields.get("total", 0.0),
+                        "filename": cand.get("file", {}).get("filename", "N/A"),
+                    },
                     "hammingDistance": None,
                     "reason": f"Semantic duplicate: identical vendor ('{t_vendor}'), date ('{t_date}'), and total (${t_total:.2f}).",
                 })
