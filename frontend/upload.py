@@ -185,8 +185,8 @@ def render_batch_hub(batch_files: List[Dict[str, Any]], user: Dict[str, Any], ex
         <div style="margin-bottom: 20px;">
             <div style="display: flex; align-items: center; justify-content: space-between;">
                 <div>
-                    <h2 style="margin: 0; font-weight: 700; font-size: 1.5rem; letter-spacing: -0.024em; color: #F5F5F7;">📦 Batch Invoice Ingestion Hub</h2>
-                    <div style="color: #86868B; font-size: 0.88rem; margin-top: 4px;">
+                    <h2 style="margin: 0; font-weight: 700; font-size: 1.5rem; letter-spacing: -0.024em; color: #1D1D1F;">📦 Batch Invoice Ingestion Hub</h2>
+                    <div style="color: #515154; font-size: 0.88rem; margin-top: 4px;">
                         Parallel OCR processing, invariant validation, duplicate detection, and ML risk scoring for enterprise document chunks.
                     </div>
                 </div>
@@ -328,9 +328,9 @@ def render_batch_hub(batch_files: List[Dict[str, Any]], user: Dict[str, Any], ex
                         <div style="display: flex; align-items: center; gap: 14px;">
                             <div style="font-size: 1.25rem;">📄</div>
                             <div>
-                                <div style="font-weight: 700; font-size: 0.92rem; color: #F5F5F7;">{fname}</div>
-                                <div style="font-size: 0.78rem; color: #86868B; margin-top: 2px;">
-                                    Vendor: <b style="color: #F5F5F7;">{vendor}</b> &nbsp;|&nbsp; Inv #: <b style="color: #F5F5F7;">{inv_no}</b> &nbsp;|&nbsp; Total: <b style="color: #64D2FF;">{curr} {total:,.2f}</b>
+                                <div style="font-weight: 700; font-size: 0.92rem; color: #1D1D1F;">{fname}</div>
+                                <div style="font-size: 0.78rem; color: #515154; margin-top: 2px;">
+                                    Vendor: <b style="color: #1D1D1F;">{vendor}</b> &nbsp;|&nbsp; Inv #: <b style="color: #1D1D1F;">{inv_no}</b> &nbsp;|&nbsp; Total: <b style="color: #0071E3;">{curr} {total:,.2f}</b>
                                 </div>
                             </div>
                         </div>
@@ -376,9 +376,9 @@ def render_batch_hub(batch_files: List[Dict[str, Any]], user: Dict[str, Any], ex
     else:
         st.markdown(
             f"""
-            <div style="background: rgba(28,28,30,0.5); border: 1.5px dashed rgba(255,255,255,0.14); border-radius: 16px; padding: 36px 20px; text-align: center; margin-top: 16px;">
-                <div style="font-weight: 700; font-size: 1.05rem; color: #F5F5F7; margin-bottom: 4px;">{len(batch_files)} Invoices Ready for Automated Verification</div>
-                <div style="color: #86868B; font-size: 0.85rem; max-width: 500px; margin: 0 auto;">Click "Run Automated Verification" above to process this entire chunk simultaneously.</div>
+            <div style="background: #FFFFFF; border: 1.5px dashed rgba(0,0,0,0.14); border-radius: 16px; padding: 36px 20px; text-align: center; margin-top: 16px; box-shadow: 0 2px 12px rgba(0,0,0,0.03);">
+                <div style="font-weight: 700; font-size: 1.05rem; color: #1D1D1F; margin-bottom: 4px;">{len(batch_files)} Invoices Ready for Automated Verification</div>
+                <div style="color: #515154; font-size: 0.85rem; max-width: 500px; margin: 0 auto;">Click "Run Automated Verification" above to process this entire chunk simultaneously.</div>
             </div>
             """,
             unsafe_allow_html=True,
@@ -551,10 +551,10 @@ def render_upload(user: Dict[str, Any]):
     if not active_file:
         st.markdown(
             """
-            <div style="background: rgba(28,28,30,0.6); backdrop-filter: blur(25px); border: 1.5px dashed rgba(255,255,255,0.15); border-radius: 18px; padding: 48px 24px; text-align: center; margin-top: 10px; box-shadow: 0 8px 32px rgba(0,0,0,0.3);">
+            <div style="background: #FFFFFF; border: 1.5px dashed rgba(0, 113, 227, 0.35); border-radius: 18px; padding: 48px 24px; text-align: center; margin-top: 10px; box-shadow: 0 4px 20px rgba(0,0,0,0.04);">
                 <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#0071E3" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom: 14px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
-                <div style="font-weight: 700; font-size: 1.15rem; color: #F5F5F7; margin-bottom: 6px; letter-spacing: -0.02em;">No Invoices Loaded</div>
-                <div style="font-size: 0.88rem; color: #86868B; max-width: 440px; margin: 0 auto 18px auto; line-height: 1.5;">Upload a single invoice, drop a chunk of multiple invoices, or open the sample drawer above to evaluate instant test scenarios.</div>
+                <div style="font-weight: 700; font-size: 1.15rem; color: #1D1D1F; margin-bottom: 6px; letter-spacing: -0.02em;">No Invoices Loaded</div>
+                <div style="font-size: 0.88rem; color: #515154; max-width: 440px; margin: 0 auto 18px auto; line-height: 1.5;">Upload a single invoice, drop a chunk of multiple invoices, or open the sample drawer above to evaluate instant test scenarios.</div>
             </div>
             """,
             unsafe_allow_html=True,
@@ -600,8 +600,8 @@ def render_upload(user: Dict[str, Any]):
         st.markdown(
             f"""
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                <div style="font-weight: 700; font-size: 0.95rem; color: #F8FAFC;">Document Preview</div>
-                <div style="font-size: 0.76rem; color: #94A3B8;">{filename} ({len(file_bytes) / 1024:.1f} KB)</div>
+                <div style="font-weight: 700; font-size: 0.95rem; color: #1D1D1F;">Document Preview</div>
+                <div style="font-size: 0.76rem; color: #515154;">{filename} ({len(file_bytes) / 1024:.1f} KB)</div>
             </div>
             """,
             unsafe_allow_html=True,
@@ -648,7 +648,7 @@ def render_upload(user: Dict[str, Any]):
                             st.session_state["pdf_page_idx"] -= 1
                             st.rerun()
                     with col_p2:
-                        st.markdown(f"<div style='text-align: center; font-size: 0.8rem; color: #94A3B8; padding-top: 6px;'>Page {curr_page + 1} of {total_pages}</div>", unsafe_allow_html=True)
+                        st.markdown(f"<div style='text-align: center; font-size: 0.8rem; color: #515154; padding-top: 6px;'>Page {curr_page + 1} of {total_pages}</div>", unsafe_allow_html=True)
                     with col_p3:
                         if st.button("Next ▶", key="p_next", disabled=curr_page >= total_pages - 1, use_container_width=True):
                             st.session_state["pdf_page_idx"] += 1
@@ -699,8 +699,8 @@ def render_upload(user: Dict[str, Any]):
         st.markdown(
             """
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-                <div style="font-weight: 700; font-size: 0.95rem; color: #F8FAFC;">Extracted Financial Fields</div>
-                <div style="font-size: 0.74rem; color: #94A3B8;">Review & correct fields before final verification</div>
+                <div style="font-weight: 700; font-size: 0.95rem; color: #1D1D1F;">Extracted Financial Fields</div>
+                <div style="font-size: 0.74rem; color: #515154;">Review & correct fields before final verification</div>
             </div>
             """,
             unsafe_allow_html=True,
@@ -711,7 +711,7 @@ def render_upload(user: Dict[str, Any]):
         with col_f1:
             st.markdown(
                 f'<div style="display: flex; justify-content: space-between; align-items: center;">'
-                f'<span style="font-size: 0.8rem; font-weight: 600; color: #94A3B8;">Invoice Number</span>'
+                f'<span style="font-size: 0.8rem; font-weight: 600; color: #515154;">Invoice Number</span>'
                 f'{components.render_confidence_chip(confidences.get("invoiceNumber", 90))}'
                 f'</div>',
                 unsafe_allow_html=True,
@@ -720,7 +720,7 @@ def render_upload(user: Dict[str, Any]):
 
             st.markdown(
                 f'<div style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px;">'
-                f'<span style="font-size: 0.8rem; font-weight: 600; color: #94A3B8;">Vendor Name</span>'
+                f'<span style="font-size: 0.8rem; font-weight: 600; color: #515154;">Vendor Name</span>'
                 f'{components.render_confidence_chip(confidences.get("vendor", 88))}'
                 f'</div>',
                 unsafe_allow_html=True,
@@ -729,7 +729,7 @@ def render_upload(user: Dict[str, Any]):
 
             st.markdown(
                 f'<div style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px;">'
-                f'<span style="font-size: 0.8rem; font-weight: 600; color: #94A3B8;">Invoice Date</span>'
+                f'<span style="font-size: 0.8rem; font-weight: 600; color: #515154;">Invoice Date</span>'
                 f'{components.render_confidence_chip(confidences.get("date", 92))}'
                 f'</div>',
                 unsafe_allow_html=True,
@@ -738,7 +738,7 @@ def render_upload(user: Dict[str, Any]):
 
             st.markdown(
                 f'<div style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px;">'
-                f'<span style="font-size: 0.8rem; font-weight: 600; color: #94A3B8;">Due Date</span>'
+                f'<span style="font-size: 0.8rem; font-weight: 600; color: #515154;">Due Date</span>'
                 f'{components.render_confidence_chip(confidences.get("dueDate", 85))}'
                 f'</div>',
                 unsafe_allow_html=True,
@@ -748,7 +748,7 @@ def render_upload(user: Dict[str, Any]):
         with col_f2:
             st.markdown(
                 f'<div style="display: flex; justify-content: space-between; align-items: center;">'
-                f'<span style="font-size: 0.8rem; font-weight: 600; color: #94A3B8;">Subtotal ($)</span>'
+                f'<span style="font-size: 0.8rem; font-weight: 600; color: #515154;">Subtotal ($)</span>'
                 f'{components.render_confidence_chip(confidences.get("subtotal", 90))}'
                 f'</div>',
                 unsafe_allow_html=True,
@@ -757,7 +757,7 @@ def render_upload(user: Dict[str, Any]):
 
             st.markdown(
                 f'<div style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px;">'
-                f'<span style="font-size: 0.8rem; font-weight: 600; color: #94A3B8;">Tax / VAT ($)</span>'
+                f'<span style="font-size: 0.8rem; font-weight: 600; color: #515154;">Tax / VAT ($)</span>'
                 f'{components.render_confidence_chip(confidences.get("tax", 90))}'
                 f'</div>',
                 unsafe_allow_html=True,
@@ -766,7 +766,7 @@ def render_upload(user: Dict[str, Any]):
 
             st.markdown(
                 f'<div style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px;">'
-                f'<span style="font-size: 0.8rem; font-weight: 600; color: #94A3B8;">Discount ($)</span>'
+                f'<span style="font-size: 0.8rem; font-weight: 600; color: #515154;">Discount ($)</span>'
                 f'{components.render_confidence_chip(confidences.get("discount", 85))}'
                 f'</div>',
                 unsafe_allow_html=True,
@@ -779,7 +779,7 @@ def render_upload(user: Dict[str, Any]):
 
             st.markdown(
                 f'<div style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px;">'
-                f'<span style="font-size: 0.8rem; font-weight: 600; color: #94A3B8;">Total Stated Amount ($)</span>'
+                f'<span style="font-size: 0.8rem; font-weight: 600; color: #515154;">Total Stated Amount ($)</span>'
                 f'{components.render_confidence_chip(confidences.get("total", 95))}'
                 f'</div>',
                 unsafe_allow_html=True,
@@ -830,7 +830,7 @@ def render_upload(user: Dict[str, Any]):
         # -------------------------------------------------------------
         st.markdown(
             """
-            <div style="font-weight: 700; font-size: 0.88rem; color: #F8FAFC; margin-top: 14px; margin-bottom: 4px;">
+            <div style="font-weight: 700; font-size: 0.88rem; color: #1D1D1F; margin-top: 14px; margin-bottom: 4px;">
                 Itemized Line Items
             </div>
             """,
@@ -893,10 +893,10 @@ def render_upload(user: Dict[str, Any]):
             f"""
             <div class="risk-preview-card">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                    <span style="font-weight: 700; font-size: 0.85rem; color: #F8FAFC;">Live AI Risk Preview</span>
+                    <span style="font-weight: 700; font-size: 0.85rem; color: #1D1D1F;">Live AI Risk Preview</span>
                     <span style="font-weight: 800; font-size: 0.85rem; color: {risk_color};">{risk_level} ({calculated_risk_score:.0f}/100)</span>
                 </div>
-                <div style="font-size: 0.78rem; color: #94A3B8;">
+                <div style="font-size: 0.78rem; color: #515154;">
                     {''.join([f'<div style="margin-top: 3px;">• {r}</div>' for r in live_reasons[:3]]) if live_reasons else '<div>✓ No risk indicators triggered. Clean document structure.</div>'}
                 </div>
             </div>

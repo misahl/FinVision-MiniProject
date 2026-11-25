@@ -117,11 +117,12 @@ def render_analytics(user: Dict[str, Any]):
                 color_continuous_scale="Reds",
             )
             fig_rules.update_layout(
-                template="plotly_dark",
+                template="plotly_white",
                 margin=dict(t=10, b=10, l=10, r=10),
                 height=300,
                 paper_bgcolor="rgba(0,0,0,0)",
                 plot_bgcolor="rgba(0,0,0,0)",
+                font=dict(color="#1D1D1F", family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', Inter, sans-serif"),
             )
             st.plotly_chart(fig_rules, use_container_width=True)
         else:
@@ -142,19 +143,20 @@ def render_analytics(user: Dict[str, Any]):
                 values="Weighted Points",
                 color="Risk Factor",
                 color_discrete_map={
-                    "Rule Invariants": "#EF4444",
-                    "Duplicate Collisions": "#F59E0B",
-                    "Computer Vision Anomalies": "#3B82F6",
-                    "ML Statistical Variance": "#8B5CF6",
+                    "Rule Invariants": "#FF3B30",
+                    "Duplicate Collisions": "#FF9500",
+                    "Computer Vision Anomalies": "#0071E3",
+                    "ML Statistical Variance": "#AF52DE",
                 },
                 hole=0.55,
             )
             fig_factors.update_layout(
-                template="plotly_dark",
+                template="plotly_white",
                 margin=dict(t=10, b=10, l=10, r=10),
                 height=300,
                 paper_bgcolor="rgba(0,0,0,0)",
                 plot_bgcolor="rgba(0,0,0,0)",
+                font=dict(color="#1D1D1F", family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', Inter, sans-serif"),
             )
             st.plotly_chart(fig_factors, use_container_width=True)
         else:
@@ -171,14 +173,15 @@ def render_analytics(user: Dict[str, Any]):
             df_scores,
             x="Risk Score",
             nbins=10,
-            color_discrete_sequence=["#2563EB"],
+            color_discrete_sequence=["#0071E3"],
         )
         fig_hist.update_layout(
-            template="plotly_dark",
+            template="plotly_white",
             margin=dict(t=10, b=10, l=10, r=10),
             height=280,
             paper_bgcolor="rgba(0,0,0,0)",
             plot_bgcolor="rgba(0,0,0,0)",
+            font=dict(color="#1D1D1F", family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', Inter, sans-serif"),
         )
         st.plotly_chart(fig_hist, use_container_width=True)
 
@@ -189,13 +192,14 @@ def render_analytics(user: Dict[str, Any]):
             df_ocr,
             x="OCR Confidence (%)",
             nbins=10,
-            color_discrete_sequence=["#10B981"],
+            color_discrete_sequence=["#34C759"],
         )
         fig_ocr.update_layout(
-            template="plotly_dark",
+            template="plotly_white",
             margin=dict(t=10, b=10, l=10, r=10),
             height=280,
             paper_bgcolor="rgba(0,0,0,0)",
             plot_bgcolor="rgba(0,0,0,0)",
+            font=dict(color="#1D1D1F", family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', Inter, sans-serif"),
         )
         st.plotly_chart(fig_ocr, use_container_width=True)

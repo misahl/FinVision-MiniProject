@@ -231,14 +231,14 @@ def render_reports(user: dict):
         f"""
         <div class="fin-card">
             <div style="display: grid; grid-template-columns: 140px 1fr 140px 1fr; row-gap: 10px; font-size: 0.9rem;">
-                <div style="font-weight: 600; color: #94A3B8;">Invoice #:</div>
-                <div style="font-weight: 700; color: #F8FAFC;">{fields.get('invoiceNumber') or 'N/A'}</div>
-                <div style="font-weight: 600; color: #94A3B8;">Risk Rating:</div>
-                <div><b>{risk.get('level', 'LOW')} ({risk.get('score', 0):.0f}/100)</b></div>
-                <div style="font-weight: 600; color: #94A3B8;">Vendor:</div>
-                <div style="color: #F8FAFC;">{fields.get('vendor') or 'N/A'}</div>
-                <div style="font-weight: 600; color: #94A3B8;">Stated Total:</div>
-                <div style="font-weight: 700; color: #F8FAFC;">${float(fields.get('total', 0.0) or 0.0):,.2f}</div>
+                <div style="font-weight: 600; color: #515154;">Invoice #:</div>
+                <div style="font-weight: 700; color: #1D1D1F;">{fields.get('invoiceNumber') or 'N/A'}</div>
+                <div style="font-weight: 600; color: #515154;">Risk Rating:</div>
+                <div style="color: #1D1D1F;"><b>{risk.get('level', 'LOW')} ({risk.get('score', 0):.0f}/100)</b></div>
+                <div style="font-weight: 600; color: #515154;">Vendor:</div>
+                <div style="color: #1D1D1F;">{fields.get('vendor') or 'N/A'}</div>
+                <div style="font-weight: 600; color: #515154;">Stated Total:</div>
+                <div style="font-weight: 700; color: #1D1D1F;">${float(fields.get('total', 0.0) or 0.0):,.2f}</div>
             </div>
         </div>
         """,

@@ -19,11 +19,12 @@ uploads/
 automata_solver/
 *.bat
 
-# Exclude raw 2.3GB image dataset, preserve metadata & docs
-Dataset/high-quality-invoice-images/
+# Exclude raw 2.3GB image dataset, preserve CSV metadata & docs
 Dataset/**/*.jpg
 Dataset/**/*.jpeg
 Dataset/**/*.png
 Dataset/**/*.pdf
+Dataset/**/*.tiff
 !Dataset/SYNTHETIC_METHOD.md
 !Dataset/manifest.csv
+!Dataset/**/*.csv

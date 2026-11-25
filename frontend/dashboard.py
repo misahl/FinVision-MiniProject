@@ -75,19 +75,19 @@ def render_dashboard(user: Dict[str, Any]):
                 names="Risk Level",
                 color="Risk Level",
                 color_discrete_map={
-                    "Low Risk": "#10B981",
-                    "Medium Variance": "#F59E0B",
-                    "High Risk": "#EF4444",
+                    "Low Risk": "#34C759",
+                    "Medium Variance": "#FF9500",
+                    "High Risk": "#FF3B30",
                 },
                 hole=0.6,
-                template="plotly_dark",
+                template="plotly_white",
             )
             fig_pie.update_layout(
                 margin=dict(t=10, b=10, l=10, r=10),
                 height=260,
                 paper_bgcolor="rgba(0,0,0,0)",
                 plot_bgcolor="rgba(0,0,0,0)",
-                font=dict(color="#94A3B8"),
+                font=dict(color="#1D1D1F", family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', Inter, sans-serif"),
                 showlegend=True,
                 legend=dict(orientation="h", yanchor="bottom", y=-0.2, xanchor="center", x=0.5),
             )
@@ -110,18 +110,18 @@ def render_dashboard(user: Dict[str, Any]):
                 y="Count",
                 color="Status",
                 color_discrete_map={
-                    "Approved": "#10B981",
-                    "Rejected": "#EF4444",
-                    "Pending Review": "#3B82F6",
+                    "Approved": "#34C759",
+                    "Rejected": "#FF3B30",
+                    "Pending Review": "#0071E3",
                 },
-                template="plotly_dark",
+                template="plotly_white",
             )
             fig_bar.update_layout(
                 margin=dict(t=10, b=10, l=10, r=10),
                 height=260,
                 paper_bgcolor="rgba(0,0,0,0)",
                 plot_bgcolor="rgba(0,0,0,0)",
-                font=dict(color="#94A3B8"),
+                font=dict(color="#1D1D1F", family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', Inter, sans-serif"),
                 showlegend=False,
             )
             st.plotly_chart(fig_bar, use_container_width=True)
@@ -138,15 +138,15 @@ def render_dashboard(user: Dict[str, Any]):
                 x="Month",
                 y="Invoices",
                 markers=True,
-                color_discrete_sequence=["#3B82F6"],
-                template="plotly_dark",
+                color_discrete_sequence=["#0071E3"],
+                template="plotly_white",
             )
             fig_trend.update_layout(
                 margin=dict(t=10, b=10, l=10, r=10),
                 height=260,
                 paper_bgcolor="rgba(0,0,0,0)",
                 plot_bgcolor="rgba(0,0,0,0)",
-                font=dict(color="#94A3B8"),
+                font=dict(color="#1D1D1F", family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', Inter, sans-serif"),
             )
             st.plotly_chart(fig_trend, use_container_width=True)
         else:

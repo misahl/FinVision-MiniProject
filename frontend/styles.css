@@ -1,30 +1,30 @@
 /* ===============================================================
-   FinVision 2.0 — Apple Pro Enterprise Dark Design System
-   Inspired by Apple.com & macOS Sequoia Human Interface Guidelines
-   Features: SF Pro typography, Frosted Glass Acrylic (Vibrancy),
-   Continuous Squircles (18-22px), Pill Badges & Buttons, Specular Highlights
+   FinVision 2.0 — Apple Pro Enterprise Light Design System
+   Inspired by Apple.com & macOS Sequoia Human Interface Guidelines (Light Mode)
+   Features: SF Pro typography, Pure White Cards, Apple Frosted Glass Vibrancy,
+   Continuous Squircles (18-22px), Pill Badges & Buttons, High-Contrast Dark Text (#1D1D1F)
    =============================================================== */
 
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
-/* --- Apple Pro Root Variables --- */
+/* --- Apple Pro Light Root Variables --- */
 :root {
-    --bg-base: #000000;
-    --bg-surface: rgba(28, 28, 30, 0.72);
-    --bg-surface-elevated: rgba(44, 44, 46, 0.85);
-    --bg-surface-hover: rgba(58, 58, 60, 0.9);
-    --border-subtle: rgba(255, 255, 255, 0.12);
+    --bg-base: #F5F5F7;
+    --bg-surface: #FFFFFF;
+    --bg-surface-elevated: #FFFFFF;
+    --bg-surface-hover: #F2F2F7;
+    --border-subtle: rgba(0, 0, 0, 0.08);
     --border-hover: rgba(0, 113, 227, 0.5);
-    --text-primary: #F5F5F7;
-    --text-secondary: #86868B;
+    --text-primary: #1D1D1F;
+    --text-secondary: #424245;
     --text-muted: #6E6E73;
     --apple-blue: #0071E3;
     --apple-blue-hover: #0077ED;
-    --apple-cyan: #64D2FF;
-    --apple-green: #30D158;
-    --apple-orange: #FF9F0A;
-    --apple-red: #FF453A;
-    --apple-purple: #BF5AF2;
+    --apple-cyan: #0284C7;
+    --apple-green: #248A3D;
+    --apple-orange: #C2410C;
+    --apple-red: #DC2626;
+    --apple-purple: #7E22CE;
     --radius-pill: 980px;
     --radius-card: 18px;
     --radius-inner: 12px;
@@ -33,8 +33,8 @@
 /* --- Global Reset & Apple Typography --- */
 html, body, [class*="css"], .stApp {
     font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", "Inter", sans-serif !important;
-    background-color: #000000 !important;
-    background: radial-gradient(ellipse 90% 45% at 50% -15%, rgba(0, 113, 227, 0.14), transparent 65%), #000000 !important;
+    background-color: #F5F5F7 !important;
+    background: radial-gradient(ellipse 90% 40% at 50% -10%, rgba(0, 113, 227, 0.06), transparent 60%), #F5F5F7 !important;
     color: var(--text-primary) !important;
     -webkit-font-smoothing: antialiased !important;
     -moz-osx-font-smoothing: grayscale !important;
@@ -48,7 +48,7 @@ header[data-testid="stHeader"] {
     -webkit-backdrop-filter: blur(20px) !important;
 }
 
-/* Apple Pro Headings */
+/* Apple Pro Headings (Dark Colors) */
 h1, h2, h3, h4, h5, h6,
 .main h1, .main h2, .main h3, .main h4,
 section.main h1, section.main h2, section.main h3 {
@@ -70,21 +70,21 @@ section.main h1, section.main h2, section.main h3 {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    background: rgba(28, 28, 30, 0.75) !important;
+    background: rgba(255, 255, 255, 0.88) !important;
     backdrop-filter: blur(30px) saturate(190%) !important;
     -webkit-backdrop-filter: blur(30px) saturate(190%) !important;
     border: 1px solid var(--border-subtle) !important;
     border-radius: var(--radius-card);
     padding: 10px 20px;
     margin-bottom: 18px;
-    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.45), inset 0 1px 0 0 rgba(255, 255, 255, 0.12);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02);
 }
 
 .fin-topbar-search {
     display: flex;
     align-items: center;
-    background: rgba(255, 255, 255, 0.06);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: #F5F5F7;
+    border: 1px solid rgba(0, 0, 0, 0.1);
     border-radius: var(--radius-pill);
     padding: 6px 14px;
     width: 290px;
@@ -94,7 +94,7 @@ section.main h1, section.main h2, section.main h3 {
 
 .fin-topbar-search:hover {
     border-color: rgba(0, 113, 227, 0.5);
-    background: rgba(255, 255, 255, 0.09);
+    background: #FFFFFF;
 }
 
 .fin-notification-bell {
@@ -106,13 +106,13 @@ section.main h1, section.main h2, section.main h3 {
     width: 36px;
     height: 36px;
     border-radius: var(--radius-pill);
-    background: rgba(255, 255, 255, 0.06);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: #F5F5F7;
+    border: 1px solid rgba(0, 0, 0, 0.08);
     transition: all 0.2s ease;
 }
 
 .fin-notification-bell:hover {
-    background: rgba(255, 255, 255, 0.12);
+    background: #E5E5EA;
 }
 
 .fin-bell-badge {
@@ -129,7 +129,7 @@ section.main h1, section.main h2, section.main h3 {
     display: flex;
     align-items: center;
     justify-content: center;
-    box-shadow: 0 2px 6px rgba(255, 69, 58, 0.4);
+    box-shadow: 0 2px 6px rgba(220, 38, 38, 0.35);
 }
 
 /* --- Apple Segmented Stepper --- */
@@ -137,21 +137,21 @@ section.main h1, section.main h2, section.main h3 {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    background: rgba(28, 28, 30, 0.65);
+    background: rgba(255, 255, 255, 0.85);
     backdrop-filter: blur(25px) saturate(180%);
     -webkit-backdrop-filter: blur(25px) saturate(180%);
     border: 1px solid var(--border-subtle);
     border-radius: var(--radius-pill);
     padding: 8px 24px;
     margin-bottom: 18px;
-    box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.08);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03);
 }
 
 .fin-step {
     display: flex;
     align-items: center;
     gap: 10px;
-    opacity: 0.5;
+    opacity: 0.6;
     transition: opacity 0.2s ease;
 }
 
@@ -160,15 +160,15 @@ section.main h1, section.main h2, section.main h3 {
 }
 
 .fin-step.completed {
-    opacity: 0.85;
+    opacity: 0.9;
 }
 
 .fin-step-circle {
     width: 26px;
     height: 26px;
     border-radius: 50%;
-    background: rgba(255, 255, 255, 0.08);
-    border: 1.5px solid rgba(255, 255, 255, 0.2);
+    background: #F5F5F7;
+    border: 1.5px solid rgba(0, 0, 0, 0.18);
     color: var(--text-secondary);
     display: flex;
     align-items: center;
@@ -179,13 +179,13 @@ section.main h1, section.main h2, section.main h3 {
 
 .fin-step.active .fin-step-circle {
     background: var(--apple-blue);
-    border-color: var(--apple-cyan);
+    border-color: var(--apple-blue);
     color: #FFFFFF;
-    box-shadow: 0 0 12px rgba(0, 113, 227, 0.6);
+    box-shadow: 0 0 10px rgba(0, 113, 227, 0.4);
 }
 
 .fin-step.completed .fin-step-circle {
-    background: rgba(48, 209, 88, 0.18);
+    background: rgba(36, 138, 61, 0.15);
     border-color: var(--apple-green);
     color: var(--apple-green);
 }
@@ -204,7 +204,7 @@ section.main h1, section.main h2, section.main h3 {
 .fin-step-line {
     flex: 1;
     height: 2px;
-    background: rgba(255, 255, 255, 0.1);
+    background: rgba(0, 0, 0, 0.08);
     margin: 0 14px;
 }
 
@@ -212,7 +212,7 @@ section.main h1, section.main h2, section.main h3 {
     background: linear-gradient(90deg, var(--apple-blue) 0%, var(--apple-green) 100%);
 }
 
-/* --- Apple Glass Dropzone --- */
+/* --- Apple Light Dropzone --- */
 [data-testid="stFileUploader"] {
     background-color: transparent !important;
     padding: 0 !important;
@@ -220,20 +220,18 @@ section.main h1, section.main h2, section.main h3 {
 }
 
 [data-testid="stFileUploaderDropzone"] {
-    background: rgba(28, 28, 30, 0.6) !important;
-    backdrop-filter: blur(24px) saturate(180%) !important;
-    -webkit-backdrop-filter: blur(24px) saturate(180%) !important;
-    border: 1.5px dashed rgba(255, 255, 255, 0.2) !important;
+    background: #FFFFFF !important;
+    border: 1.5px dashed rgba(0, 113, 227, 0.35) !important;
     border-radius: 20px !important;
-    padding: 22px 28px !important;
+    padding: 24px 28px !important;
     transition: all 0.25s cubic-bezier(0.25, 1, 0.5, 1) !important;
-    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.3) !important;
+    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.04) !important;
 }
 
 [data-testid="stFileUploaderDropzone"]:hover {
     border-color: var(--apple-blue) !important;
-    background: rgba(0, 113, 227, 0.08) !important;
-    box-shadow: 0 8px 30px rgba(0, 113, 227, 0.2) !important;
+    background: rgba(0, 113, 227, 0.04) !important;
+    box-shadow: 0 6px 24px rgba(0, 113, 227, 0.15) !important;
 }
 
 [data-testid="stFileUploaderDropzone"] button {
@@ -243,18 +241,18 @@ section.main h1, section.main h2, section.main h3 {
     border-radius: var(--radius-pill) !important;
     font-weight: 600 !important;
     padding: 6px 20px !important;
-    box-shadow: 0 4px 12px rgba(0, 113, 227, 0.35) !important;
+    box-shadow: 0 3px 10px rgba(0, 113, 227, 0.3) !important;
 }
 
 [data-testid="stAlert"] {
-    background: rgba(28, 28, 30, 0.8) !important;
-    backdrop-filter: blur(20px) !important;
+    background: #FFFFFF !important;
     border: 1px solid var(--border-subtle) !important;
     border-radius: var(--radius-inner) !important;
     color: var(--text-primary) !important;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04) !important;
 }
 
-/* --- Apple Per-Field Confidence Chips --- */
+/* --- Apple Per-Field Confidence Chips (Light Mode) --- */
 .conf-chip {
     display: inline-flex;
     align-items: center;
@@ -267,77 +265,73 @@ section.main h1, section.main h2, section.main h3 {
 }
 
 .conf-chip-high {
-    background: rgba(48, 209, 88, 0.12);
-    color: var(--apple-green);
-    border: 1px solid rgba(48, 209, 88, 0.3);
+    background: rgba(36, 138, 61, 0.12);
+    color: #166534;
+    border: 1px solid rgba(36, 138, 61, 0.3);
 }
 
 .conf-chip-med {
-    background: rgba(0, 113, 227, 0.12);
-    color: var(--apple-cyan);
-    border: 1px solid rgba(0, 113, 227, 0.35);
+    background: rgba(0, 113, 227, 0.1);
+    color: #0369A1;
+    border: 1px solid rgba(0, 113, 227, 0.28);
 }
 
 .conf-chip-low {
-    background: rgba(255, 159, 10, 0.14);
-    color: var(--apple-orange);
-    border: 1.5px solid var(--apple-orange);
-    box-shadow: 0 0 8px rgba(255, 159, 10, 0.35);
+    background: rgba(194, 65, 12, 0.12);
+    color: #9A3412;
+    border: 1.5px solid rgba(194, 65, 12, 0.5);
+    box-shadow: 0 0 6px rgba(194, 65, 12, 0.2);
 }
 
-/* --- Apple Live Math Validation Banner --- */
+/* --- Apple Live Math Validation Banner (Light Mode) --- */
 .math-bar-pass {
-    background: rgba(48, 209, 88, 0.1);
-    backdrop-filter: blur(16px);
-    border: 1px solid rgba(48, 209, 88, 0.28);
-    border-left: 4px solid var(--apple-green);
+    background: #F0FDF4;
+    border: 1px solid rgba(34, 197, 94, 0.35);
+    border-left: 4px solid #16A34A;
     border-radius: var(--radius-inner);
     padding: 11px 16px;
     display: flex;
     align-items: center;
     justify-content: space-between;
     margin: 10px 0;
-    color: var(--apple-green);
+    color: #14532D;
     font-size: 0.86rem;
     font-weight: 600;
 }
 
 .math-bar-fail {
-    background: rgba(255, 69, 58, 0.1);
-    backdrop-filter: blur(16px);
-    border: 1px solid rgba(255, 69, 58, 0.3);
-    border-left: 4px solid var(--apple-red);
+    background: #FEF2F2;
+    border: 1px solid rgba(239, 68, 68, 0.35);
+    border-left: 4px solid #DC2626;
     border-radius: var(--radius-inner);
     padding: 11px 16px;
     display: flex;
     align-items: center;
     justify-content: space-between;
     margin: 10px 0;
-    color: var(--apple-red);
+    color: #7F1D1D;
     font-size: 0.86rem;
     font-weight: 600;
 }
 
-/* --- Apple Glass Risk Preview Card --- */
+/* --- Apple Glass Risk Preview Card (Light Mode) --- */
 .risk-preview-card {
-    background: rgba(28, 28, 30, 0.72);
-    backdrop-filter: blur(25px) saturate(180%);
-    -webkit-backdrop-filter: blur(25px) saturate(180%);
+    background: #FFFFFF;
     border: 1px solid var(--border-subtle);
     border-radius: var(--radius-card);
     padding: 18px;
     margin-top: 14px;
-    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.35), inset 0 1px 0 0 rgba(255, 255, 255, 0.1);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
 }
 
-/* --- Apple Sticky Bottom Action Bar --- */
+/* --- Apple Sticky Bottom Action Bar (Light Mode) --- */
 .fin-sticky-bar {
     position: sticky;
     bottom: 0;
-    background: rgba(18, 18, 20, 0.88);
+    background: rgba(255, 255, 255, 0.94);
     backdrop-filter: blur(30px) saturate(190%);
     -webkit-backdrop-filter: blur(30px) saturate(190%);
-    border-top: 1px solid rgba(255, 255, 255, 0.12);
+    border-top: 1px solid rgba(0, 0, 0, 0.08);
     border-radius: 20px 20px 0 0;
     padding: 14px 24px;
     display: flex;
@@ -345,7 +339,7 @@ section.main h1, section.main h2, section.main h3 {
     align-items: center;
     z-index: 99;
     margin-top: 24px;
-    box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.5);
+    box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.06);
 }
 
 /* --- Apple Status Indicator Pill --- */
@@ -356,18 +350,18 @@ section.main h1, section.main h2, section.main h3 {
     font-size: 0.75rem;
     font-weight: 600;
     padding: 4px 14px;
-    background: rgba(48, 209, 88, 0.12);
-    color: var(--apple-green);
-    border: 1px solid rgba(48, 209, 88, 0.3);
+    background: rgba(36, 138, 61, 0.12);
+    color: #166534;
+    border: 1px solid rgba(36, 138, 61, 0.3);
     border-radius: var(--radius-pill);
 }
 
 .fin-status-dot {
     width: 7px;
     height: 7px;
-    background-color: var(--apple-green);
+    background-color: #248A3D;
     border-radius: 50%;
-    box-shadow: 0 0 10px var(--apple-green);
+    box-shadow: 0 0 8px #248A3D;
 }
 
 /* --- Form Widget Labels --- */
@@ -388,14 +382,15 @@ input[type="password"],
 div[data-baseweb="input"] input,
 div[data-baseweb="textarea"] textarea,
 textarea {
-    background-color: rgba(28, 28, 30, 0.75) !important;
+    background-color: #FFFFFF !important;
     color: var(--text-primary) !important;
-    border: 1px solid rgba(255, 255, 255, 0.15) !important;
+    border: 1px solid rgba(0, 0, 0, 0.16) !important;
     border-radius: var(--radius-inner) !important;
     font-size: 0.9rem !important;
     font-weight: 500 !important;
     padding: 10px 14px !important;
     transition: all 0.18s cubic-bezier(0.25, 1, 0.5, 1) !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02) !important;
 }
 
 input[type="text"]:focus,
@@ -403,20 +398,20 @@ input[type="number"]:focus,
 textarea:focus,
 div[data-baseweb="input"]:focus-within {
     border-color: var(--apple-blue) !important;
-    box-shadow: 0 0 0 3.5px rgba(0, 113, 227, 0.35) !important;
+    box-shadow: 0 0 0 3px rgba(0, 113, 227, 0.25) !important;
     outline: none !important;
 }
 
-/* --- Selectbox & Dropdowns --- */
+/* --- Selectbox & Dropdowns (Light Mode) --- */
 div[data-baseweb="select"] {
-    background-color: rgba(28, 28, 30, 0.75) !important;
+    background-color: #FFFFFF !important;
     border-radius: var(--radius-inner) !important;
 }
 
 div[data-baseweb="select"] > div {
-    background-color: rgba(28, 28, 30, 0.75) !important;
+    background-color: #FFFFFF !important;
     color: var(--text-primary) !important;
-    border: 1px solid rgba(255, 255, 255, 0.15) !important;
+    border: 1px solid rgba(0, 0, 0, 0.16) !important;
     border-radius: var(--radius-inner) !important;
 }
 
@@ -427,11 +422,10 @@ div[data-baseweb="select"] * {
 div[data-baseweb="popover"],
 div[data-baseweb="menu"],
 ul[role="listbox"] {
-    background-color: rgba(28, 28, 30, 0.95) !important;
-    backdrop-filter: blur(25px) !important;
-    border: 1px solid rgba(255, 255, 255, 0.15) !important;
+    background-color: #FFFFFF !important;
+    border: 1px solid rgba(0, 0, 0, 0.12) !important;
     border-radius: var(--radius-inner) !important;
-    box-shadow: 0 16px 36px rgba(0, 0, 0, 0.6) !important;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.12) !important;
 }
 
 ul[role="listbox"] li {
@@ -441,15 +435,14 @@ ul[role="listbox"] li {
 
 ul[role="listbox"] li:hover,
 ul[role="listbox"] li[aria-selected="true"] {
-    background-color: var(--apple-blue) !important;
-    color: #FFFFFF !important;
+    background-color: rgba(0, 113, 227, 0.08) !important;
+    color: var(--apple-blue) !important;
 }
 
-/* --- Apple Segmented Controls --- */
+/* --- Apple Segmented Controls (Light Mode) --- */
 div[data-testid="stSegmentedControl"] {
-    background-color: rgba(118, 118, 128, 0.24) !important;
-    backdrop-filter: blur(15px) !important;
-    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    background-color: rgba(118, 118, 128, 0.12) !important;
+    border: 1px solid rgba(0, 0, 0, 0.06) !important;
     border-radius: var(--radius-pill) !important;
     padding: 3px !important;
 }
@@ -463,14 +456,14 @@ div[data-testid="stSegmentedControl"] button {
 }
 
 div[data-testid="stSegmentedControl"] button[aria-selected="true"] {
-    background: var(--apple-blue) !important;
-    color: #FFFFFF !important;
-    box-shadow: 0 2px 10px rgba(0, 113, 227, 0.45) !important;
+    background: #FFFFFF !important;
+    color: var(--text-primary) !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12) !important;
 }
 
-/* --- Apple Tabs --- */
+/* --- Apple Tabs (Light Mode) --- */
 div[data-baseweb="tab-list"] {
-    border-bottom: 1.5px solid rgba(255, 255, 255, 0.1) !important;
+    border-bottom: 1.5px solid rgba(0, 0, 0, 0.08) !important;
     gap: 12px !important;
     background-color: transparent !important;
 }
@@ -488,21 +481,19 @@ button[data-baseweb="tab"] {
 
 button[data-baseweb="tab"]:hover {
     color: var(--text-primary) !important;
-    background-color: rgba(255, 255, 255, 0.05) !important;
+    background-color: rgba(0, 0, 0, 0.04) !important;
 }
 
 button[data-baseweb="tab"][aria-selected="true"] {
-    color: var(--apple-cyan) !important;
+    color: var(--apple-blue) !important;
     font-weight: 700 !important;
     border-bottom: 2.5px solid var(--apple-blue) !important;
 }
 
-/* --- Apple macOS Sidebar --- */
+/* --- Apple macOS Sidebar (Light Mode) --- */
 section[data-testid="stSidebar"] {
-    background-color: rgba(18, 18, 20, 0.85) !important;
-    backdrop-filter: blur(30px) saturate(190%) !important;
-    -webkit-backdrop-filter: blur(30px) saturate(190%) !important;
-    border-right: 1px solid var(--border-subtle) !important;
+    background-color: #F2F2F7 !important;
+    border-right: 1px solid rgba(0, 0, 0, 0.08) !important;
 }
 
 section[data-testid="stSidebar"] h1,
@@ -520,7 +511,7 @@ section[data-testid="stSidebar"] div[role="radiogroup"] label {
 }
 
 section[data-testid="stSidebar"] div[role="radiogroup"] label:hover {
-    background-color: rgba(255, 255, 255, 0.08) !important;
+    background-color: rgba(0, 0, 0, 0.05) !important;
 }
 
 section[data-testid="stSidebar"] div[role="radiogroup"] label p {
@@ -534,9 +525,9 @@ section[data-testid="stSidebar"] div[role="radiogroup"] label:hover p {
 }
 
 section[data-testid="stSidebar"] div[role="radiogroup"] label[data-checked="true"] {
-    background: linear-gradient(90deg, #0071E3 0%, #005bb5 100%) !important;
+    background: #0071E3 !important;
     border-radius: var(--radius-pill) !important;
-    box-shadow: 0 2px 10px rgba(0, 113, 227, 0.45) !important;
+    box-shadow: 0 2px 8px rgba(0, 113, 227, 0.35) !important;
 }
 
 section[data-testid="stSidebar"] div[role="radiogroup"] label[data-checked="true"] p {
@@ -544,15 +535,13 @@ section[data-testid="stSidebar"] div[role="radiogroup"] label[data-checked="true
     font-weight: 700 !important;
 }
 
-/* --- Apple Glass KPI Cards --- */
+/* --- Apple KPI Metric Cards (Light Mode) --- */
 .fin-card {
-    background: rgba(28, 28, 30, 0.7) !important;
-    backdrop-filter: blur(25px) saturate(180%) !important;
-    -webkit-backdrop-filter: blur(25px) saturate(180%) !important;
+    background: #FFFFFF !important;
     border: 1px solid var(--border-subtle) !important;
     border-radius: var(--radius-card) !important;
     padding: 18px 22px !important;
-    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.35), inset 0 1px 0 0 rgba(255, 255, 255, 0.1) !important;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02) !important;
     transition: transform 0.2s cubic-bezier(0.25, 1, 0.5, 1), border-color 0.2s ease !important;
     position: relative;
     overflow: hidden;
@@ -560,7 +549,8 @@ section[data-testid="stSidebar"] div[role="radiogroup"] label[data-checked="true
 
 .fin-card:hover {
     transform: translateY(-2px) !important;
-    border-color: rgba(0, 113, 227, 0.45) !important;
+    border-color: rgba(0, 113, 227, 0.4) !important;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08) !important;
 }
 
 .fin-card::before {
@@ -569,16 +559,16 @@ section[data-testid="stSidebar"] div[role="radiogroup"] label[data-checked="true
     top: 0;
     left: 0;
     right: 0;
-    height: 1.5px;
+    height: 2px;
     background: linear-gradient(90deg, var(--apple-blue) 0%, rgba(0, 113, 227, 0) 100%);
 }
 
 .fin-card-title {
     font-size: 0.74rem !important;
-    font-weight: 600 !important;
+    font-weight: 700 !important;
     text-transform: uppercase !important;
     letter-spacing: 0.08em !important;
-    color: var(--text-secondary) !important;
+    color: var(--text-muted) !important;
     margin-bottom: 6px !important;
 }
 
@@ -592,66 +582,73 @@ section[data-testid="stSidebar"] div[role="radiogroup"] label[data-checked="true
 
 .fin-card-subtitle {
     font-size: 0.78rem !important;
-    color: var(--text-muted) !important;
+    color: var(--text-secondary) !important;
     margin-top: 6px !important;
 }
 
-/* --- Apple Modern Risk & Status Badges --- */
+/* --- Apple Modern Risk & Status Badges (Light Mode) --- */
 .badge-low {
     display: inline-flex !important;
     align-items: center !important;
-    background-color: rgba(48, 209, 88, 0.14) !important;
-    color: var(--apple-green) !important;
+    background-color: rgba(36, 138, 61, 0.12) !important;
+    color: #166534 !important;
     font-weight: 700 !important;
     padding: 3px 12px !important;
     border-radius: var(--radius-pill) !important;
     font-size: 0.76rem !important;
-    border: 1px solid rgba(48, 209, 88, 0.3) !important;
+    border: 1px solid rgba(36, 138, 61, 0.3) !important;
     letter-spacing: 0.02em !important;
 }
 
 .badge-medium {
     display: inline-flex !important;
     align-items: center !important;
-    background-color: rgba(255, 159, 10, 0.14) !important;
-    color: var(--apple-orange) !important;
+    background-color: rgba(194, 65, 12, 0.12) !important;
+    color: #9A3412 !important;
     font-weight: 700 !important;
     padding: 3px 12px !important;
     border-radius: var(--radius-pill) !important;
     font-size: 0.76rem !important;
-    border: 1px solid rgba(255, 159, 10, 0.3) !important;
+    border: 1px solid rgba(194, 65, 12, 0.35) !important;
     letter-spacing: 0.02em !important;
 }
 
 .badge-high {
     display: inline-flex !important;
     align-items: center !important;
-    background-color: rgba(255, 69, 58, 0.14) !important;
-    color: var(--apple-red) !important;
+    background-color: rgba(220, 38, 38, 0.12) !important;
+    color: #991B1B !important;
     font-weight: 700 !important;
     padding: 3px 12px !important;
     border-radius: var(--radius-pill) !important;
     font-size: 0.76rem !important;
-    border: 1px solid rgba(255, 69, 58, 0.3) !important;
+    border: 1px solid rgba(220, 38, 38, 0.35) !important;
     letter-spacing: 0.02em !important;
 }
 
-/* --- Verification Rule Cards --- */
+/* --- Verification Rule Cards (Light Mode) --- */
 .rule-item-pass {
-    background-color: rgba(48, 209, 88, 0.06) !important;
-    backdrop-filter: blur(12px) !important;
-    border: 1px solid rgba(48, 209, 88, 0.22) !important;
-    border-left: 4px solid var(--apple-green) !important;
+    background-color: #F0FDF4 !important;
+    border: 1px solid rgba(34, 197, 94, 0.35) !important;
+    border-left: 4px solid #16A34A !important;
     border-radius: var(--radius-inner) !important;
     padding: 13px 16px !important;
     margin-bottom: 8px !important;
 }
 
 .rule-item-fail {
-    background-color: rgba(255, 69, 58, 0.08) !important;
-    backdrop-filter: blur(12px) !important;
-    border: 1px solid rgba(255, 69, 58, 0.3) !important;
-    border-left: 4px solid var(--apple-red) !important;
+    background-color: #FEF2F2 !important;
+    border: 1px solid rgba(239, 68, 68, 0.35) !important;
+    border-left: 4px solid #DC2626 !important;
+    border-radius: var(--radius-inner) !important;
+    padding: 13px 16px !important;
+    margin-bottom: 8px !important;
+}
+
+.rule-item-warn {
+    background-color: #FFFBEB !important;
+    border: 1px solid rgba(245, 158, 11, 0.35) !important;
+    border-left: 4px solid #D97706 !important;
     border-radius: var(--radius-inner) !important;
     padding: 13px 16px !important;
     margin-bottom: 8px !important;
@@ -665,58 +662,73 @@ section[data-testid="stSidebar"] div[role="radiogroup"] label[data-checked="true
     letter-spacing: -0.01em !important;
     padding: 8px 20px !important;
     transition: all 0.2s cubic-bezier(0.25, 1, 0.5, 1) !important;
-    border: 1px solid rgba(255, 255, 255, 0.14) !important;
+    border: 1px solid rgba(0, 0, 0, 0.12) !important;
 }
 
 .stButton > button[kind="primary"] {
     background: linear-gradient(180deg, #0077ED 0%, #0071E3 100%) !important;
     color: #FFFFFF !important;
     border: none !important;
-    box-shadow: 0 4px 14px 0 rgba(0, 113, 227, 0.4) !important;
+    box-shadow: 0 3px 10px 0 rgba(0, 113, 227, 0.35) !important;
 }
 
 .stButton > button[kind="primary"]:hover {
     background: linear-gradient(180deg, #0081FA 0%, #0077ED 100%) !important;
-    box-shadow: 0 6px 20px 0 rgba(0, 113, 227, 0.55) !important;
+    box-shadow: 0 4px 16px 0 rgba(0, 113, 227, 0.45) !important;
     transform: translateY(-1px) !important;
 }
 
 .stButton > button[kind="secondary"] {
-    background: rgba(255, 255, 255, 0.08) !important;
+    background: #FFFFFF !important;
     color: var(--text-primary) !important;
-    border: 1px solid rgba(255, 255, 255, 0.16) !important;
+    border: 1px solid rgba(0, 0, 0, 0.14) !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04) !important;
 }
 
 .stButton > button[kind="secondary"]:hover {
-    background: rgba(255, 255, 255, 0.14) !important;
-    border-color: rgba(255, 255, 255, 0.25) !important;
+    background: #F2F2F7 !important;
+    border-color: rgba(0, 0, 0, 0.2) !important;
 }
 
-/* --- Apple Batch Ingestion Hub --- */
+/* --- Apple Batch Ingestion Hub (Light Mode) --- */
 .batch-hub-card {
-    background: rgba(28, 28, 30, 0.75);
-    backdrop-filter: blur(30px) saturate(190%);
-    -webkit-backdrop-filter: blur(30px) saturate(190%);
+    background: #FFFFFF;
     border: 1px solid var(--border-subtle);
     border-radius: var(--radius-card);
     padding: 24px;
     margin-bottom: 20px;
-    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4), inset 0 1px 0 0 rgba(255, 255, 255, 0.12);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
 }
 
 .batch-row-item {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 12px 18px;
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    padding: 14px 20px;
+    background: #FFFFFF;
+    border: 1px solid rgba(0, 0, 0, 0.08);
     border-radius: var(--radius-inner);
     margin-bottom: 8px;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.02);
     transition: all 0.18s ease;
 }
 
 .batch-row-item:hover {
-    background: rgba(255, 255, 255, 0.08);
-    border-color: rgba(0, 113, 227, 0.4);
+    background: #F9F9FB;
+    border-color: rgba(0, 113, 227, 0.3);
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.05);
+}
+
+/* --- Streamlit Dataframe & Data Editor (Light Theme) --- */
+div[data-testid="stDataFrame"],
+div[data-testid="stDataEditor"] {
+    background-color: #FFFFFF !important;
+    border: 1px solid rgba(0, 0, 0, 0.1) !important;
+    border-radius: var(--radius-inner) !important;
+    color: #1D1D1F !important;
+}
+
+div[data-testid="stDataFrame"] *,
+div[data-testid="stDataEditor"] * {
+    color: #1D1D1F !important;
 }
