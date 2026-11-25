@@ -286,33 +286,25 @@ def render_app():
     }
     display_title = page_title_map.get(current_page, current_page)
     components.render_topbar(user, active_section=display_title)
-                <div>Engine: <b>FinVision v2.1</b></div>
-                <div>OCR: <b>PyMuPDF + Tesseract</b></div>
-                <div>Storage: <b>GCS Verified</b></div>
-                <div>Rules: <b>Deterministic Math</b></div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
 
     # Page Router
-    if selected_page == "Overview":
+    if current_page == "Overview":
         dashboard.render_dashboard(user)
-    elif selected_page == "Upload & Analyze":
+    elif current_page == "Upload & Analyze":
         upload.render_upload(user)
-    elif selected_page == "Verification Results":
+    elif current_page == "Verification Results":
         verify.render_verify(user)
-    elif selected_page == "Document History":
+    elif current_page == "Document History":
         history.render_history(user)
-    elif selected_page == "Duplicate Detection":
+    elif current_page == "Duplicate Detection":
         duplicate_workspace.render_duplicate_workspace(user)
-    elif selected_page == "Risk Analytics":
+    elif current_page == "Risk Analytics":
         analytics.render_analytics(user)
-    elif selected_page == "Reports":
+    elif current_page == "Reports":
         reports.render_reports(user)
-    elif selected_page == "Settings":
+    elif current_page == "Settings":
         settings.render_settings(user)
-    elif selected_page == "Administration":
+    elif current_page == "Administration":
         admin.render_admin(user)
 
 
