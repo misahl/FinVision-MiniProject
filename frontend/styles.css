@@ -1,80 +1,100 @@
 /* ===============================================================
-   FinVision 2.0 Ultra-Modern Fintech Design System (Inter / Lucide Inspired)
-   High-Contrast Executive Dark Palette (#0B1020, #121A2F), Micro-Interactions
+   FinVision 2.0 — Apple Pro Enterprise Dark Design System
+   Inspired by Apple.com & macOS Sequoia Human Interface Guidelines
+   Features: SF Pro typography, Frosted Glass Acrylic (Vibrancy),
+   Continuous Squircles (18-22px), Pill Badges & Buttons, Specular Highlights
    =============================================================== */
 
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
-/* --- Root Variables --- */
+/* --- Apple Pro Root Variables --- */
 :root {
-    --bg-base: #0B1020;
-    --bg-card: #121A2F;
-    --bg-card-hover: #18233E;
-    --border-subtle: rgba(255, 255, 255, 0.08);
-    --border-hover: rgba(99, 102, 241, 0.4);
-    --text-primary: #F8FAFC;
-    --text-secondary: #94A3B8;
-    --text-muted: #64748B;
-    --accent-indigo: #4F46E5;
-    --accent-blue: #3B82F6;
-    --accent-teal: #14B8A6;
-    --accent-emerald: #10B981;
-    --accent-amber: #F59E0B;
-    --accent-rose: #EF4444;
+    --bg-base: #000000;
+    --bg-surface: rgba(28, 28, 30, 0.72);
+    --bg-surface-elevated: rgba(44, 44, 46, 0.85);
+    --bg-surface-hover: rgba(58, 58, 60, 0.9);
+    --border-subtle: rgba(255, 255, 255, 0.12);
+    --border-hover: rgba(0, 113, 227, 0.5);
+    --text-primary: #F5F5F7;
+    --text-secondary: #86868B;
+    --text-muted: #6E6E73;
+    --apple-blue: #0071E3;
+    --apple-blue-hover: #0077ED;
+    --apple-cyan: #64D2FF;
+    --apple-green: #30D158;
+    --apple-orange: #FF9F0A;
+    --apple-red: #FF453A;
+    --apple-purple: #BF5AF2;
+    --radius-pill: 980px;
+    --radius-card: 18px;
+    --radius-inner: 12px;
 }
 
-/* --- Global Reset & Typography --- */
+/* --- Global Reset & Apple Typography --- */
 html, body, [class*="css"], .stApp {
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
-    background-color: var(--bg-base) !important;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", "Inter", sans-serif !important;
+    background-color: #000000 !important;
+    background: radial-gradient(ellipse 90% 45% at 50% -15%, rgba(0, 113, 227, 0.14), transparent 65%), #000000 !important;
     color: var(--text-primary) !important;
+    -webkit-font-smoothing: antialiased !important;
+    -moz-osx-font-smoothing: grayscale !important;
+    letter-spacing: -0.012em !important;
 }
 
 /* Streamlit Header / Toolbar cleanup */
 header[data-testid="stHeader"] {
     background: transparent !important;
-    backdrop-filter: blur(8px) !important;
+    backdrop-filter: blur(20px) !important;
+    -webkit-backdrop-filter: blur(20px) !important;
 }
 
-/* Headings */
+/* Apple Pro Headings */
 h1, h2, h3, h4, h5, h6,
 .main h1, .main h2, .main h3, .main h4,
 section.main h1, section.main h2, section.main h3 {
     color: var(--text-primary) !important;
     font-weight: 700 !important;
-    letter-spacing: -0.02em !important;
+    letter-spacing: -0.024em !important;
 }
 
-.main h1 { font-size: 1.75rem !important; margin-bottom: 0.35rem !important; }
-.main h2 { font-size: 1.35rem !important; margin-top: 0.6rem !important; margin-bottom: 0.25rem !important; }
-.main h3 { font-size: 1.1rem !important; margin-top: 0.5rem !important; margin-bottom: 0.25rem !important; }
+.main h1 { font-size: 1.85rem !important; margin-bottom: 0.35rem !important; }
+.main h2 { font-size: 1.4rem !important; margin-top: 0.6rem !important; margin-bottom: 0.25rem !important; }
+.main h3 { font-size: 1.15rem !important; margin-top: 0.5rem !important; margin-bottom: 0.25rem !important; }
 
 .main p, .main span, .main div {
     color: var(--text-secondary);
 }
 
-/* --- Top Navigation Header Bar --- */
+/* --- Apple Top Navigation Header Bar --- */
 .fin-topbar {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    background: #121A2F !important;
+    background: rgba(28, 28, 30, 0.75) !important;
+    backdrop-filter: blur(30px) saturate(190%) !important;
+    -webkit-backdrop-filter: blur(30px) saturate(190%) !important;
     border: 1px solid var(--border-subtle) !important;
-    border-radius: 12px;
-    padding: 10px 18px;
-    margin-bottom: 16px;
-    box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.4);
+    border-radius: var(--radius-card);
+    padding: 10px 20px;
+    margin-bottom: 18px;
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.45), inset 0 1px 0 0 rgba(255, 255, 255, 0.12);
 }
 
 .fin-topbar-search {
     display: flex;
     align-items: center;
-    background: rgba(11, 16, 32, 0.8);
+    background: rgba(255, 255, 255, 0.06);
     border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 8px;
-    padding: 6px 12px;
-    width: 280px;
+    border-radius: var(--radius-pill);
+    padding: 6px 14px;
+    width: 290px;
     cursor: text;
+    transition: all 0.2s ease;
+}
+
+.fin-topbar-search:hover {
+    border-color: rgba(0, 113, 227, 0.5);
+    background: rgba(255, 255, 255, 0.09);
 }
 
 .fin-notification-bell {
@@ -83,46 +103,55 @@ section.main h1, section.main h2, section.main h3 {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 34px;
-    height: 34px;
-    border-radius: 8px;
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    width: 36px;
+    height: 36px;
+    border-radius: var(--radius-pill);
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    transition: all 0.2s ease;
+}
+
+.fin-notification-bell:hover {
+    background: rgba(255, 255, 255, 0.12);
 }
 
 .fin-bell-badge {
     position: absolute;
     top: -2px;
     right: -2px;
-    background: #EF4444;
+    background: var(--apple-red);
     color: #FFFFFF;
     font-size: 0.62rem;
     font-weight: 700;
-    width: 15px;
-    height: 15px;
+    width: 16px;
+    height: 16px;
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
+    box-shadow: 0 2px 6px rgba(255, 69, 58, 0.4);
 }
 
-/* --- Lifecycle Stepper (Upload > Extract > Validate > Risk Score) --- */
+/* --- Apple Segmented Stepper --- */
 .fin-stepper {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    background: #121A2F;
+    background: rgba(28, 28, 30, 0.65);
+    backdrop-filter: blur(25px) saturate(180%);
+    -webkit-backdrop-filter: blur(25px) saturate(180%);
     border: 1px solid var(--border-subtle);
-    border-radius: 12px;
-    padding: 12px 24px;
-    margin-bottom: 16px;
+    border-radius: var(--radius-pill);
+    padding: 8px 24px;
+    margin-bottom: 18px;
+    box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.08);
 }
 
 .fin-step {
     display: flex;
     align-items: center;
     gap: 10px;
-    opacity: 0.55;
+    opacity: 0.5;
     transition: opacity 0.2s ease;
 }
 
@@ -131,16 +160,16 @@ section.main h1, section.main h2, section.main h3 {
 }
 
 .fin-step.completed {
-    opacity: 0.9;
+    opacity: 0.85;
 }
 
 .fin-step-circle {
     width: 26px;
     height: 26px;
     border-radius: 50%;
-    background: #1E293B;
-    border: 1.5px solid #475569;
-    color: #94A3B8;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1.5px solid rgba(255, 255, 255, 0.2);
+    color: var(--text-secondary);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -149,383 +178,389 @@ section.main h1, section.main h2, section.main h3 {
 }
 
 .fin-step.active .fin-step-circle {
-    background: #4F46E5;
-    border-color: #818CF8;
+    background: var(--apple-blue);
+    border-color: var(--apple-cyan);
     color: #FFFFFF;
-    box-shadow: 0 0 10px rgba(79, 70, 229, 0.5);
+    box-shadow: 0 0 12px rgba(0, 113, 227, 0.6);
 }
 
 .fin-step.completed .fin-step-circle {
-    background: rgba(16, 185, 129, 0.2);
-    border-color: #10B981;
-    color: #34D399;
+    background: rgba(48, 209, 88, 0.18);
+    border-color: var(--apple-green);
+    color: var(--apple-green);
 }
 
 .fin-step-label {
     font-size: 0.82rem;
     font-weight: 600;
-    color: #94A3B8;
+    color: var(--text-secondary);
 }
 
 .fin-step.active .fin-step-label {
-    color: #F8FAFC;
+    color: var(--text-primary);
     font-weight: 700;
 }
 
 .fin-step-line {
     flex: 1;
     height: 2px;
-    background: #1E293B;
+    background: rgba(255, 255, 255, 0.1);
     margin: 0 14px;
 }
 
 .fin-step-line.active {
-    background: linear-gradient(90deg, #4F46E5 0%, #10B981 100%);
+    background: linear-gradient(90deg, var(--apple-blue) 0%, var(--apple-green) 100%);
 }
 
-/* --- Slim Dark Dropzone --- */
+/* --- Apple Glass Dropzone --- */
 [data-testid="stFileUploader"] {
     background-color: transparent !important;
     padding: 0 !important;
-    margin-bottom: 12px !important;
+    margin-bottom: 14px !important;
 }
 
 [data-testid="stFileUploaderDropzone"] {
-    background-color: #121A2F !important;
-    border: 1.5px dashed rgba(99, 102, 241, 0.45) !important;
-    border-radius: 12px !important;
-    padding: 18px 24px !important;
-    transition: all 0.2s ease !important;
+    background: rgba(28, 28, 30, 0.6) !important;
+    backdrop-filter: blur(24px) saturate(180%) !important;
+    -webkit-backdrop-filter: blur(24px) saturate(180%) !important;
+    border: 1.5px dashed rgba(255, 255, 255, 0.2) !important;
+    border-radius: 20px !important;
+    padding: 22px 28px !important;
+    transition: all 0.25s cubic-bezier(0.25, 1, 0.5, 1) !important;
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.3) !important;
 }
 
 [data-testid="stFileUploaderDropzone"]:hover {
-    border-color: #6366F1 !important;
-    background-color: rgba(99, 102, 241, 0.06) !important;
+    border-color: var(--apple-blue) !important;
+    background: rgba(0, 113, 227, 0.08) !important;
+    box-shadow: 0 8px 30px rgba(0, 113, 227, 0.2) !important;
 }
 
 [data-testid="stFileUploaderDropzone"] button {
-    background-color: #1E293B !important;
-    color: #F8FAFC !important;
-    border: 1px solid rgba(255, 255, 255, 0.12) !important;
-    border-radius: 8px !important;
+    background: linear-gradient(180deg, #0077ED 0%, #0071E3 100%) !important;
+    color: #FFFFFF !important;
+    border: none !important;
+    border-radius: var(--radius-pill) !important;
     font-weight: 600 !important;
+    padding: 6px 20px !important;
+    box-shadow: 0 4px 12px rgba(0, 113, 227, 0.35) !important;
 }
 
 [data-testid="stAlert"] {
-    background-color: #121A2F !important;
-    border: 1px solid rgba(255, 255, 255, 0.08) !important;
-    border-radius: 10px !important;
-    color: #F8FAFC !important;
+    background: rgba(28, 28, 30, 0.8) !important;
+    backdrop-filter: blur(20px) !important;
+    border: 1px solid var(--border-subtle) !important;
+    border-radius: var(--radius-inner) !important;
+    color: var(--text-primary) !important;
 }
 
-/* --- Per-Field Confidence Chips --- */
+/* --- Apple Per-Field Confidence Chips --- */
 .conf-chip {
     display: inline-flex;
     align-items: center;
     font-size: 0.72rem;
     font-weight: 600;
-    padding: 2px 8px;
-    border-radius: 6px;
+    padding: 2px 10px;
+    border-radius: var(--radius-pill);
     margin-left: 6px;
+    letter-spacing: 0.02em;
 }
 
 .conf-chip-high {
-    background: rgba(16, 185, 129, 0.12);
-    color: #34D399;
-    border: 1px solid rgba(16, 185, 129, 0.3);
+    background: rgba(48, 209, 88, 0.12);
+    color: var(--apple-green);
+    border: 1px solid rgba(48, 209, 88, 0.3);
 }
 
 .conf-chip-med {
-    background: rgba(59, 130, 246, 0.12);
-    color: #60A5FA;
-    border: 1px solid rgba(59, 130, 246, 0.3);
+    background: rgba(0, 113, 227, 0.12);
+    color: var(--apple-cyan);
+    border: 1px solid rgba(0, 113, 227, 0.35);
 }
 
 .conf-chip-low {
-    background: rgba(245, 158, 11, 0.12);
-    color: #FBBF24;
-    border: 1.5px solid #F59E0B;
-    box-shadow: 0 0 6px rgba(245, 158, 11, 0.3);
+    background: rgba(255, 159, 10, 0.14);
+    color: var(--apple-orange);
+    border: 1.5px solid var(--apple-orange);
+    box-shadow: 0 0 8px rgba(255, 159, 10, 0.35);
 }
 
-/* --- Live Math Validation Banner --- */
+/* --- Apple Live Math Validation Banner --- */
 .math-bar-pass {
-    background: rgba(16, 185, 129, 0.1);
-    border: 1px solid rgba(16, 185, 129, 0.3);
-    border-left: 4px solid #10B981;
-    border-radius: 8px;
-    padding: 10px 14px;
+    background: rgba(48, 209, 88, 0.1);
+    backdrop-filter: blur(16px);
+    border: 1px solid rgba(48, 209, 88, 0.28);
+    border-left: 4px solid var(--apple-green);
+    border-radius: var(--radius-inner);
+    padding: 11px 16px;
     display: flex;
     align-items: center;
     justify-content: space-between;
     margin: 10px 0;
-    color: #34D399;
-    font-size: 0.85rem;
+    color: var(--apple-green);
+    font-size: 0.86rem;
     font-weight: 600;
 }
 
 .math-bar-fail {
-    background: rgba(239, 68, 68, 0.1);
-    border: 1px solid rgba(239, 68, 68, 0.3);
-    border-left: 4px solid #EF4444;
-    border-radius: 8px;
-    padding: 10px 14px;
+    background: rgba(255, 69, 58, 0.1);
+    backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 69, 58, 0.3);
+    border-left: 4px solid var(--apple-red);
+    border-radius: var(--radius-inner);
+    padding: 11px 16px;
     display: flex;
     align-items: center;
     justify-content: space-between;
     margin: 10px 0;
-    color: #F87171;
-    font-size: 0.85rem;
+    color: var(--apple-red);
+    font-size: 0.86rem;
     font-weight: 600;
 }
 
-/* --- Live Risk Preview Card --- */
+/* --- Apple Glass Risk Preview Card --- */
 .risk-preview-card {
-    background: #121A2F;
+    background: rgba(28, 28, 30, 0.72);
+    backdrop-filter: blur(25px) saturate(180%);
+    -webkit-backdrop-filter: blur(25px) saturate(180%);
     border: 1px solid var(--border-subtle);
-    border-radius: 12px;
-    padding: 16px;
+    border-radius: var(--radius-card);
+    padding: 18px;
     margin-top: 14px;
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.35), inset 0 1px 0 0 rgba(255, 255, 255, 0.1);
 }
 
-/* --- Sticky Bottom Action Bar --- */
+/* --- Apple Sticky Bottom Action Bar --- */
 .fin-sticky-bar {
     position: sticky;
     bottom: 0;
-    background: rgba(18, 26, 47, 0.95);
-    backdrop-filter: blur(10px);
-    border-top: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 12px 12px 0 0;
-    padding: 12px 20px;
+    background: rgba(18, 18, 20, 0.88);
+    backdrop-filter: blur(30px) saturate(190%);
+    -webkit-backdrop-filter: blur(30px) saturate(190%);
+    border-top: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 20px 20px 0 0;
+    padding: 14px 24px;
     display: flex;
     justify-content: space-between;
     align-items: center;
     z-index: 99;
-    margin-top: 20px;
-}
-    color: #FFFFFF !important;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    letter-spacing: -0.02em;
+    margin-top: 24px;
+    box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.5);
 }
 
+/* --- Apple Status Indicator Pill --- */
 .fin-status-pill {
     display: inline-flex;
     align-items: center;
     gap: 6px;
     font-size: 0.75rem;
     font-weight: 600;
-    padding: 4px 12px;
-    background: rgba(16, 185, 129, 0.12);
-    color: #34D399;
-    border: 1px solid rgba(16, 185, 129, 0.25);
-    border-radius: 9999px;
+    padding: 4px 14px;
+    background: rgba(48, 209, 88, 0.12);
+    color: var(--apple-green);
+    border: 1px solid rgba(48, 209, 88, 0.3);
+    border-radius: var(--radius-pill);
 }
 
 .fin-status-dot {
     width: 7px;
     height: 7px;
-    background-color: #10B981;
+    background-color: var(--apple-green);
     border-radius: 50%;
-    box-shadow: 0 0 8px #10B981;
+    box-shadow: 0 0 10px var(--apple-green);
 }
 
 /* --- Form Widget Labels --- */
 label, label p, label span,
 div[data-testid="stWidgetLabel"] p,
 div[data-testid="stWidgetLabel"] label {
-    color: #E2E8F0 !important;
+    color: var(--text-primary) !important;
     font-size: 0.85rem !important;
     font-weight: 600 !important;
     margin-bottom: 4px !important;
-    letter-spacing: 0.01em !important;
+    letter-spacing: -0.01em !important;
 }
 
-/* --- Input Fields (Text, Number, TextArea) --- */
+/* --- Apple Styled Inputs (Text, Number, TextArea) --- */
 input[type="text"],
 input[type="number"],
 input[type="password"],
 div[data-baseweb="input"] input,
 div[data-baseweb="textarea"] textarea,
 textarea {
-    background-color: #161F30 !important;
-    color: #F8FAFC !important;
-    border: 1.5px solid #2D3748 !important;
-    border-radius: 8px !important;
+    background-color: rgba(28, 28, 30, 0.75) !important;
+    color: var(--text-primary) !important;
+    border: 1px solid rgba(255, 255, 255, 0.15) !important;
+    border-radius: var(--radius-inner) !important;
     font-size: 0.9rem !important;
     font-weight: 500 !important;
-    padding: 9px 14px !important;
-    transition: all 0.15s ease !important;
+    padding: 10px 14px !important;
+    transition: all 0.18s cubic-bezier(0.25, 1, 0.5, 1) !important;
 }
 
 input[type="text"]:focus,
 input[type="number"]:focus,
 textarea:focus,
 div[data-baseweb="input"]:focus-within {
-    border-color: #3B82F6 !important;
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25) !important;
+    border-color: var(--apple-blue) !important;
+    box-shadow: 0 0 0 3.5px rgba(0, 113, 227, 0.35) !important;
     outline: none !important;
-}
-
-/* Number Input Stepper Buttons (+ / -) */
-div[data-testid="stNumberInput"] button {
-    background-color: #1F2937 !important;
-    color: #E2E8F0 !important;
-    border: 1px solid #374151 !important;
-}
-
-div[data-testid="stNumberInput"] button:hover {
-    background-color: #374151 !important;
-    color: #FFFFFF !important;
 }
 
 /* --- Selectbox & Dropdowns --- */
 div[data-baseweb="select"] {
-    background-color: #161F30 !important;
-    border-radius: 8px !important;
+    background-color: rgba(28, 28, 30, 0.75) !important;
+    border-radius: var(--radius-inner) !important;
 }
 
 div[data-baseweb="select"] > div {
-    background-color: #161F30 !important;
-    color: #F8FAFC !important;
-    border: 1.5px solid #2D3748 !important;
-    border-radius: 8px !important;
+    background-color: rgba(28, 28, 30, 0.75) !important;
+    color: var(--text-primary) !important;
+    border: 1px solid rgba(255, 255, 255, 0.15) !important;
+    border-radius: var(--radius-inner) !important;
 }
 
 div[data-baseweb="select"] * {
-    color: #F8FAFC !important;
+    color: var(--text-primary) !important;
 }
 
 div[data-baseweb="popover"],
 div[data-baseweb="menu"],
 ul[role="listbox"] {
-    background-color: #161F30 !important;
-    border: 1px solid #374151 !important;
-    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.6) !important;
+    background-color: rgba(28, 28, 30, 0.95) !important;
+    backdrop-filter: blur(25px) !important;
+    border: 1px solid rgba(255, 255, 255, 0.15) !important;
+    border-radius: var(--radius-inner) !important;
+    box-shadow: 0 16px 36px rgba(0, 0, 0, 0.6) !important;
 }
 
 ul[role="listbox"] li {
-    color: #F8FAFC !important;
-    background-color: #161F30 !important;
+    color: var(--text-primary) !important;
+    background-color: transparent !important;
 }
 
 ul[role="listbox"] li:hover,
 ul[role="listbox"] li[aria-selected="true"] {
-    background-color: #1E3A8A !important;
-    color: #93C5FD !important;
+    background-color: var(--apple-blue) !important;
+    color: #FFFFFF !important;
 }
 
-/* --- Segmented Control / Modern Pills --- */
+/* --- Apple Segmented Controls --- */
 div[data-testid="stSegmentedControl"] {
-    background-color: #111827 !important;
-    border: 1px solid var(--border-subtle) !important;
-    border-radius: 10px !important;
-    padding: 4px !important;
+    background-color: rgba(118, 118, 128, 0.24) !important;
+    backdrop-filter: blur(15px) !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    border-radius: var(--radius-pill) !important;
+    padding: 3px !important;
 }
 
 div[data-testid="stSegmentedControl"] button {
-    border-radius: 7px !important;
+    border-radius: var(--radius-pill) !important;
     font-size: 0.85rem !important;
     font-weight: 600 !important;
-    color: #94A3B8 !important;
-    transition: all 0.15s ease !important;
+    color: var(--text-secondary) !important;
+    transition: all 0.2s cubic-bezier(0.25, 1, 0.5, 1) !important;
 }
 
 div[data-testid="stSegmentedControl"] button[aria-selected="true"] {
-    background-color: #2563EB !important;
+    background: var(--apple-blue) !important;
     color: #FFFFFF !important;
-    box-shadow: 0 2px 8px rgba(37, 99, 235, 0.4) !important;
+    box-shadow: 0 2px 10px rgba(0, 113, 227, 0.45) !important;
 }
 
-/* --- Tabs --- */
+/* --- Apple Tabs --- */
 div[data-baseweb="tab-list"] {
-    border-bottom: 1.5px solid #1E293B !important;
-    gap: 8px !important;
+    border-bottom: 1.5px solid rgba(255, 255, 255, 0.1) !important;
+    gap: 12px !important;
     background-color: transparent !important;
 }
 
 button[data-baseweb="tab"] {
     background-color: transparent !important;
-    color: #94A3B8 !important;
-    font-size: 0.9rem !important;
+    color: var(--text-secondary) !important;
+    font-size: 0.92rem !important;
     font-weight: 600 !important;
     padding: 10px 18px !important;
     border: none !important;
-    border-radius: 6px 6px 0 0 !important;
-    transition: all 0.15s ease-in-out !important;
+    border-radius: 8px 8px 0 0 !important;
+    transition: all 0.18s ease !important;
 }
 
 button[data-baseweb="tab"]:hover {
-    color: #F8FAFC !important;
-    background-color: rgba(255, 255, 255, 0.04) !important;
+    color: var(--text-primary) !important;
+    background-color: rgba(255, 255, 255, 0.05) !important;
 }
 
 button[data-baseweb="tab"][aria-selected="true"] {
-    color: #60A5FA !important;
+    color: var(--apple-cyan) !important;
     font-weight: 700 !important;
-    border-bottom: 2.5px solid #3B82F6 !important;
+    border-bottom: 2.5px solid var(--apple-blue) !important;
 }
 
-/* --- Sidebar --- */
+/* --- Apple macOS Sidebar --- */
 section[data-testid="stSidebar"] {
-    background-color: #0D121F !important;
+    background-color: rgba(18, 18, 20, 0.85) !important;
+    backdrop-filter: blur(30px) saturate(190%) !important;
+    -webkit-backdrop-filter: blur(30px) saturate(190%) !important;
     border-right: 1px solid var(--border-subtle) !important;
 }
 
 section[data-testid="stSidebar"] h1,
 section[data-testid="stSidebar"] h2,
 section[data-testid="stSidebar"] h3 {
-    color: #F8FAFC !important;
+    color: var(--text-primary) !important;
 }
 
 section[data-testid="stSidebar"] div[role="radiogroup"] label {
     background-color: transparent !important;
-    padding: 9px 12px !important;
-    border-radius: 8px !important;
+    padding: 8px 14px !important;
+    border-radius: var(--radius-pill) !important;
     margin-bottom: 4px !important;
-    transition: all 0.15s ease !important;
+    transition: all 0.18s cubic-bezier(0.25, 1, 0.5, 1) !important;
 }
 
 section[data-testid="stSidebar"] div[role="radiogroup"] label:hover {
-    background-color: #172033 !important;
+    background-color: rgba(255, 255, 255, 0.08) !important;
 }
 
 section[data-testid="stSidebar"] div[role="radiogroup"] label p {
-    color: #94A3B8 !important;
+    color: var(--text-secondary) !important;
     font-size: 0.88rem !important;
     font-weight: 500 !important;
 }
 
 section[data-testid="stSidebar"] div[role="radiogroup"] label:hover p {
-    color: #F8FAFC !important;
+    color: var(--text-primary) !important;
 }
 
 section[data-testid="stSidebar"] div[role="radiogroup"] label[data-checked="true"] {
-    background: linear-gradient(90deg, #1E3A8A 0%, #172554 100%) !important;
-    border-left: 3px solid #3B82F6 !important;
+    background: linear-gradient(90deg, #0071E3 0%, #005bb5 100%) !important;
+    border-radius: var(--radius-pill) !important;
+    box-shadow: 0 2px 10px rgba(0, 113, 227, 0.45) !important;
 }
 
 section[data-testid="stSidebar"] div[role="radiogroup"] label[data-checked="true"] p {
-    color: #93C5FD !important;
+    color: #FFFFFF !important;
     font-weight: 700 !important;
 }
 
-/* --- Executive Glass KPI Cards --- */
+/* --- Apple Glass KPI Cards --- */
 .fin-card {
-    background: linear-gradient(145deg, #131C2E 0%, #0F172A 100%) !important;
+    background: rgba(28, 28, 30, 0.7) !important;
+    backdrop-filter: blur(25px) saturate(180%) !important;
+    -webkit-backdrop-filter: blur(25px) saturate(180%) !important;
     border: 1px solid var(--border-subtle) !important;
-    border-radius: 12px !important;
-    padding: 18px 20px !important;
-    box-shadow: 0 4px 15px -3px rgba(0, 0, 0, 0.4) !important;
-    transition: transform 0.15s ease, border-color 0.15s ease !important;
+    border-radius: var(--radius-card) !important;
+    padding: 18px 22px !important;
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.35), inset 0 1px 0 0 rgba(255, 255, 255, 0.1) !important;
+    transition: transform 0.2s cubic-bezier(0.25, 1, 0.5, 1), border-color 0.2s ease !important;
     position: relative;
     overflow: hidden;
 }
 
 .fin-card:hover {
     transform: translateY(-2px) !important;
-    border-color: var(--border-hover) !important;
+    border-color: rgba(0, 113, 227, 0.45) !important;
 }
 
 .fin-card::before {
@@ -534,167 +569,154 @@ section[data-testid="stSidebar"] div[role="radiogroup"] label[data-checked="true
     top: 0;
     left: 0;
     right: 0;
-    height: 2px;
-    background: linear-gradient(90deg, #3B82F6 0%, rgba(59, 130, 246, 0) 100%);
+    height: 1.5px;
+    background: linear-gradient(90deg, var(--apple-blue) 0%, rgba(0, 113, 227, 0) 100%);
 }
 
 .fin-card-title {
-    font-size: 0.76rem !important;
+    font-size: 0.74rem !important;
     font-weight: 600 !important;
     text-transform: uppercase !important;
     letter-spacing: 0.08em !important;
-    color: #94A3B8 !important;
+    color: var(--text-secondary) !important;
     margin-bottom: 6px !important;
 }
 
 .fin-card-value {
     font-size: 1.85rem !important;
     font-weight: 800 !important;
-    color: #F8FAFC !important;
+    color: var(--text-primary) !important;
     line-height: 1.1 !important;
-    letter-spacing: -0.02em !important;
+    letter-spacing: -0.024em !important;
 }
 
 .fin-card-subtitle {
     font-size: 0.78rem !important;
-    color: #64748B !important;
+    color: var(--text-muted) !important;
     margin-top: 6px !important;
 }
 
-/* --- Modern Risk Badges --- */
+/* --- Apple Modern Risk & Status Badges --- */
 .badge-low {
     display: inline-flex !important;
     align-items: center !important;
-    background-color: rgba(16, 185, 129, 0.15) !important;
-    color: #34D399 !important;
+    background-color: rgba(48, 209, 88, 0.14) !important;
+    color: var(--apple-green) !important;
     font-weight: 700 !important;
-    padding: 3px 11px !important;
-    border-radius: 9999px !important;
-    font-size: 0.78rem !important;
-    border: 1px solid rgba(16, 185, 129, 0.3) !important;
-    letter-spacing: 0.03em !important;
+    padding: 3px 12px !important;
+    border-radius: var(--radius-pill) !important;
+    font-size: 0.76rem !important;
+    border: 1px solid rgba(48, 209, 88, 0.3) !important;
+    letter-spacing: 0.02em !important;
 }
 
 .badge-medium {
     display: inline-flex !important;
     align-items: center !important;
-    background-color: rgba(245, 158, 11, 0.15) !important;
-    color: #FBBF24 !important;
+    background-color: rgba(255, 159, 10, 0.14) !important;
+    color: var(--apple-orange) !important;
     font-weight: 700 !important;
-    padding: 3px 11px !important;
-    border-radius: 9999px !important;
-    font-size: 0.78rem !important;
-    border: 1px solid rgba(245, 158, 11, 0.3) !important;
-    letter-spacing: 0.03em !important;
+    padding: 3px 12px !important;
+    border-radius: var(--radius-pill) !important;
+    font-size: 0.76rem !important;
+    border: 1px solid rgba(255, 159, 10, 0.3) !important;
+    letter-spacing: 0.02em !important;
 }
 
 .badge-high {
     display: inline-flex !important;
     align-items: center !important;
-    background-color: rgba(239, 68, 68, 0.15) !important;
-    color: #F87171 !important;
+    background-color: rgba(255, 69, 58, 0.14) !important;
+    color: var(--apple-red) !important;
     font-weight: 700 !important;
-    padding: 3px 11px !important;
-    border-radius: 9999px !important;
-    font-size: 0.78rem !important;
-    border: 1px solid rgba(239, 68, 68, 0.3) !important;
-    letter-spacing: 0.03em !important;
+    padding: 3px 12px !important;
+    border-radius: var(--radius-pill) !important;
+    font-size: 0.76rem !important;
+    border: 1px solid rgba(255, 69, 58, 0.3) !important;
+    letter-spacing: 0.02em !important;
 }
 
 /* --- Verification Rule Cards --- */
 .rule-item-pass {
-    background-color: #131E2E !important;
-    border: 1px solid rgba(16, 185, 129, 0.25) !important;
-    border-left: 4px solid #10B981 !important;
-    border-radius: 8px !important;
+    background-color: rgba(48, 209, 88, 0.06) !important;
+    backdrop-filter: blur(12px) !important;
+    border: 1px solid rgba(48, 209, 88, 0.22) !important;
+    border-left: 4px solid var(--apple-green) !important;
+    border-radius: var(--radius-inner) !important;
     padding: 13px 16px !important;
     margin-bottom: 8px !important;
 }
 
 .rule-item-fail {
-    background-color: #24141E !important;
-    border: 1px solid rgba(239, 68, 68, 0.35) !important;
-    border-left: 4px solid #EF4444 !important;
-    border-radius: 8px !important;
+    background-color: rgba(255, 69, 58, 0.08) !important;
+    backdrop-filter: blur(12px) !important;
+    border: 1px solid rgba(255, 69, 58, 0.3) !important;
+    border-left: 4px solid var(--apple-red) !important;
+    border-radius: var(--radius-inner) !important;
     padding: 13px 16px !important;
     margin-bottom: 8px !important;
 }
 
-.rule-item-warn {
-    background-color: #241C14 !important;
-    border: 1px solid rgba(245, 158, 11, 0.3) !important;
-    border-left: 4px solid #F59E0B !important;
-    border-radius: 8px !important;
-    padding: 13px 16px !important;
-    margin-bottom: 8px !important;
+/* --- Streamlit Native Buttons (Pill Shapes) --- */
+.stButton > button {
+    border-radius: var(--radius-pill) !important;
+    font-weight: 600 !important;
+    font-size: 0.88rem !important;
+    letter-spacing: -0.01em !important;
+    padding: 8px 20px !important;
+    transition: all 0.2s cubic-bezier(0.25, 1, 0.5, 1) !important;
+    border: 1px solid rgba(255, 255, 255, 0.14) !important;
 }
 
-/* --- Buttons --- */
-button[kind="primary"],
 .stButton > button[kind="primary"] {
-    background: linear-gradient(180deg, #3B82F6 0%, #2563EB 100%) !important;
+    background: linear-gradient(180deg, #0077ED 0%, #0071E3 100%) !important;
     color: #FFFFFF !important;
     border: none !important;
-    border-radius: 8px !important;
-    font-weight: 600 !important;
-    padding: 9px 18px !important;
-    box-shadow: 0 2px 10px rgba(37, 99, 235, 0.4) !important;
-    transition: all 0.15s ease !important;
+    box-shadow: 0 4px 14px 0 rgba(0, 113, 227, 0.4) !important;
 }
 
-button[kind="primary"]:hover {
-    background: linear-gradient(180deg, #60A5FA 0%, #3B82F6 100%) !important;
+.stButton > button[kind="primary"]:hover {
+    background: linear-gradient(180deg, #0081FA 0%, #0077ED 100%) !important;
+    box-shadow: 0 6px 20px 0 rgba(0, 113, 227, 0.55) !important;
     transform: translateY(-1px) !important;
 }
 
-button[kind="secondary"],
-.stButton > button {
-    background-color: #161F30 !important;
-    color: #E2E8F0 !important;
-    border: 1px solid #2D3748 !important;
-    border-radius: 8px !important;
-    font-weight: 600 !important;
-    padding: 9px 16px !important;
-    transition: all 0.15s ease !important;
+.stButton > button[kind="secondary"] {
+    background: rgba(255, 255, 255, 0.08) !important;
+    color: var(--text-primary) !important;
+    border: 1px solid rgba(255, 255, 255, 0.16) !important;
 }
 
-button[kind="secondary"]:hover,
-.stButton > button:hover {
-    background-color: #1F2937 !important;
-    border-color: #4B5563 !important;
-    color: #FFFFFF !important;
+.stButton > button[kind="secondary"]:hover {
+    background: rgba(255, 255, 255, 0.14) !important;
+    border-color: rgba(255, 255, 255, 0.25) !important;
 }
 
-/* --- DataFrames & Tables --- */
-div[data-testid="stDataFrame"] {
-    background-color: #111827 !important;
-    border: 1px solid var(--border-subtle) !important;
-    border-radius: 10px !important;
-    overflow: hidden !important;
+/* --- Apple Batch Ingestion Hub --- */
+.batch-hub-card {
+    background: rgba(28, 28, 30, 0.75);
+    backdrop-filter: blur(30px) saturate(190%);
+    -webkit-backdrop-filter: blur(30px) saturate(190%);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-card);
+    padding: 24px;
+    margin-bottom: 20px;
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4), inset 0 1px 0 0 rgba(255, 255, 255, 0.12);
 }
 
-/* --- Expanders --- */
-div[data-testid="stExpander"] {
-    background-color: #111827 !important;
-    border: 1px solid var(--border-subtle) !important;
-    border-radius: 10px !important;
+.batch-row-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 18px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: var(--radius-inner);
+    margin-bottom: 8px;
+    transition: all 0.18s ease;
 }
 
-/* Smooth custom scrollbars */
-::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
-}
-
-::-webkit-scrollbar-track {
-    background: #0B0F19;
-}
-
-::-webkit-scrollbar-thumb {
-    background: #1F2937;
-    border-radius: 3px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-    background: #374151;
+.batch-row-item:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(0, 113, 227, 0.4);
 }

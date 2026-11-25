@@ -110,9 +110,16 @@ def render_verify(user: dict):
             img_bytes = firebase_service.download_invoice_bytes(storage_path)
             if img_bytes:
                 try:
-                    pil_img = Image.open(io.BytesIO(img_bytes))
+                    if img_bytes.startswith(b"%PDF"):
+                        import pymupdf
+                        doc_pdf = pymupdf.open(stream=img_bytes, filetype="pdf")
+                        page = doc_pdf[0]
+                        pix = page.get_pixmap(dpi=150)
+                        pil_img = Image.open(io.BytesIO(pix.tobytes("png")))
+                    else:
+                        pil_img = Image.open(io.BytesIO(img_bytes))
                     st.image(pil_img, caption=file_info.get("filename", "Invoice Scan"), use_container_width=True)
-                except Exception:
+                except Exception as e:
                     st.info(f"File: {file_info.get('filename')} ({len(img_bytes)} bytes)")
             else:
                 st.caption("File preview unavailable from storage.")

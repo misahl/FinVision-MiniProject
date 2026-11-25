@@ -2,6 +2,7 @@
 
 from decimal import Decimal
 import io
+import zipfile
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 import pandas as pd
@@ -175,6 +176,215 @@ def run_pipeline_on_bytes(
     }
 
 
+def render_batch_hub(batch_files: List[Dict[str, Any]], user: Dict[str, Any], existing_docs: List[Dict[str, Any]]):
+    """Render enterprise Apple-styled Batch Chunk Ingestion workspace."""
+    total_size_mb = sum(f.get("size", len(f.get("bytes", b""))) for f in batch_files) / (1024 * 1024)
+
+    st.markdown(
+        f"""
+        <div style="margin-bottom: 20px;">
+            <div style="display: flex; align-items: center; justify-content: space-between;">
+                <div>
+                    <h2 style="margin: 0; font-weight: 700; font-size: 1.5rem; letter-spacing: -0.024em; color: #F5F5F7;">📦 Batch Invoice Ingestion Hub</h2>
+                    <div style="color: #86868B; font-size: 0.88rem; margin-top: 4px;">
+                        Parallel OCR processing, invariant validation, duplicate detection, and ML risk scoring for enterprise document chunks.
+                    </div>
+                </div>
+                <div class="fin-status-pill">
+                    <span class="fin-status-dot"></span>
+                    <span>Batch Engine Ready</span>
+                </div>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    # 4 Apple Frosted Glass KPI Cards
+    k1, k2, k3, k4 = st.columns(4)
+    with k1:
+        components.render_kpi_card("Queued Invoices", f"{len(batch_files)} docs", "Batch Chunk Size")
+    with k2:
+        components.render_kpi_card("Total Payload", f"{total_size_mb:.2f} MB", "Compressed Scan Data")
+    with k3:
+        components.render_kpi_card("Audit Rules", "10 Invariants", "Deterministic Math Engine")
+    with k4:
+        components.render_kpi_card("Risk Engine", "Active", "Random Forest + CV Heuristics")
+
+    st.markdown("<div style='margin-top: 16px;'></div>", unsafe_allow_html=True)
+
+    # Action bar
+    btn_col1, btn_col2 = st.columns([3, 1])
+    with btn_col1:
+        run_batch = st.button(
+            f"⚡ Run Automated Verification on All {len(batch_files)} Documents",
+            type="primary",
+            use_container_width=True,
+            key="btn_run_batch_verification",
+        )
+    with btn_col2:
+        if st.button("Clear Batch", type="secondary", use_container_width=True):
+            st.session_state.pop("batch_chunk_files", None)
+            st.session_state.pop("batch_verification_results", None)
+            st.rerun()
+
+    # If run_batch clicked
+    if run_batch:
+        prog_bar = st.progress(0, text="Initializing batch verification pipeline...")
+        batch_results = []
+        for i, doc_item in enumerate(batch_files):
+            prog_bar.progress((i + 1) / len(batch_files), text=f"Processing {i + 1}/{len(batch_files)}: {doc_item['name']}...")
+            try:
+                res = run_pipeline_on_bytes(
+                    filename=doc_item["name"],
+                    file_bytes=doc_item["bytes"],
+                    user=user,
+                    existing_docs=existing_docs,
+                )
+                math_rules = [r for r in res["verif"].get("ruleResults", []) if "MATH" in r.get("rule_id", "") or "TOTAL" in r.get("rule_id", "")]
+                math_ok = all(r.get("passed", True) for r in math_rules) if math_rules else True
+                batch_results.append({
+                    "status": "success",
+                    "filename": doc_item["name"],
+                    "vendor": res["fields"].get("vendorName") or "N/A",
+                    "invoice_no": res["fields"].get("invoiceNumber") or "N/A",
+                    "date": res["fields"].get("invoiceDate") or "N/A",
+                    "total": res["fields"].get("totalAmount") or 0.0,
+                    "currency": res["fields"].get("currency") or "USD",
+                    "math_pass": math_ok,
+                    "is_dup": res["dup"].get("isDuplicate", False),
+                    "risk_score": res["risk"]["score"],
+                    "risk_level": res["risk"]["level"],
+                    "docId": res["docId"],
+                    "doc_item": doc_item,
+                })
+            except Exception as e:
+                batch_results.append({
+                    "status": "error",
+                    "filename": doc_item["name"],
+                    "vendor": "Extraction Error",
+                    "invoice_no": "N/A",
+                    "date": "N/A",
+                    "total": 0.0,
+                    "currency": "USD",
+                    "math_pass": False,
+                    "is_dup": False,
+                    "risk_score": 100.0,
+                    "risk_level": "HIGH",
+                    "docId": "N/A",
+                    "error": str(e),
+                    "doc_item": doc_item,
+                })
+        st.session_state["batch_verification_results"] = batch_results
+        st.toast(f"Batch completed: {len(batch_results)} invoices verified!", icon="✓")
+        st.rerun()
+
+    # Results Table if processed
+    results = st.session_state.get("batch_verification_results")
+    if results:
+        st.markdown("<hr style='border-color: rgba(255,255,255,0.1); margin: 24px 0 16px 0;'>", unsafe_allow_html=True)
+
+        low_count = len([r for r in results if r.get("risk_level") == "LOW"])
+        med_count = len([r for r in results if r.get("risk_level") == "MEDIUM"])
+        high_count = len([r for r in results if r.get("risk_level") == "HIGH"])
+        dup_count = len([r for r in results if r.get("is_dup")])
+
+        # Summary Badges
+        st.markdown(
+            f"""
+            <div style="display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap;">
+                <span class="badge-low">✓ Verified / Low Risk: {low_count}</span>
+                <span class="badge-medium">⚠ Review Recommended: {med_count}</span>
+                <span class="badge-high">✕ High Risk / Flagged: {high_count}</span>
+                <span class="conf-chip conf-chip-low">⚠️ Duplicate Collisions: {dup_count}</span>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        st.markdown("<h3 style='font-size: 1.15rem; margin-bottom: 12px; font-weight: 700;'>Batch Verification Outcomes</h3>", unsafe_allow_html=True)
+
+        for idx, row in enumerate(results):
+            fname = row["filename"]
+            vendor = row.get("vendor", "N/A")
+            inv_no = row.get("invoice_no", "N/A")
+            total = row.get("total", 0.0)
+            curr = row.get("currency", "USD")
+            math_pass = row.get("math_pass", True)
+            is_dup = row.get("is_dup", False)
+            risk_score = row.get("risk_score", 0.0)
+            risk_level = row.get("risk_level", "LOW")
+
+            math_badge = '<span style="color: #30D158; font-weight: 600; font-size: 0.78rem;">✓ Math Invariants Match</span>' if math_pass else '<span style="color: #FF453A; font-weight: 700; font-size: 0.78rem;">✕ Arithmetic Discrepancy</span>'
+            dup_badge = '<span style="color: #FF9F0A; font-weight: 700; font-size: 0.78rem;">⚠ Duplicate Collision</span>' if is_dup else '<span style="color: #86868B; font-size: 0.78rem;">✓ Unique Document</span>'
+
+            risk_pill = components.render_risk_badge(risk_level, risk_score)
+
+            item_col1, item_col2 = st.columns([4, 1.2])
+            with item_col1:
+                st.markdown(
+                    f"""
+                    <div class="batch-row-item">
+                        <div style="display: flex; align-items: center; gap: 14px;">
+                            <div style="font-size: 1.25rem;">📄</div>
+                            <div>
+                                <div style="font-weight: 700; font-size: 0.92rem; color: #F5F5F7;">{fname}</div>
+                                <div style="font-size: 0.78rem; color: #86868B; margin-top: 2px;">
+                                    Vendor: <b style="color: #F5F5F7;">{vendor}</b> &nbsp;|&nbsp; Inv #: <b style="color: #F5F5F7;">{inv_no}</b> &nbsp;|&nbsp; Total: <b style="color: #64D2FF;">{curr} {total:,.2f}</b>
+                                </div>
+                            </div>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 14px;">
+                            <div>{math_badge}</div>
+                            <div>{dup_badge}</div>
+                            <div>{risk_pill}</div>
+                        </div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+            with item_col2:
+                if st.button("🔍 Inspect", key=f"btn_inspect_batch_{idx}", use_container_width=True):
+                    st.session_state["uploaded_file_cache"] = row["doc_item"]
+                    st.session_state["upload_view_mode_toggle"] = "🔍 Detailed Document Inspector"
+                    st.rerun()
+
+        # Export CSV Button
+        df_export = pd.DataFrame([
+            {
+                "Filename": r["filename"],
+                "Vendor": r.get("vendor"),
+                "InvoiceNumber": r.get("invoice_no"),
+                "TotalAmount": r.get("total"),
+                "Currency": r.get("currency"),
+                "MathInvariantPassed": r.get("math_pass"),
+                "DuplicateCollision": r.get("is_dup"),
+                "RiskScore": r.get("risk_score"),
+                "RiskLevel": r.get("risk_level"),
+                "DocId": r.get("docId"),
+            }
+            for r in results
+        ])
+        st.markdown("<div style='margin-top: 16px;'></div>", unsafe_allow_html=True)
+        st.download_button(
+            "📥 Export Batch Audit Summary (CSV)",
+            data=df_export.to_csv(index=False),
+            file_name="finvision_batch_audit_summary.csv",
+            mime="text/csv",
+            use_container_width=False,
+        )
+    else:
+        st.markdown(
+            f"""
+            <div style="background: rgba(28,28,30,0.5); border: 1.5px dashed rgba(255,255,255,0.14); border-radius: 16px; padding: 36px 20px; text-align: center; margin-top: 16px;">
+                <div style="font-weight: 700; font-size: 1.05rem; color: #F5F5F7; margin-bottom: 4px;">{len(batch_files)} Invoices Ready for Automated Verification</div>
+                <div style="color: #86868B; font-size: 0.85rem; max-width: 500px; margin: 0 auto;">Click "Run Automated Verification" above to process this entire chunk simultaneously.</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+
 def render_upload(user: Dict[str, Any]):
     """Render modern split-view Ingest & Verify workspace."""
     owner_uid = None if user.get("role") == "admin" else user.get("uid")
@@ -189,7 +399,7 @@ def render_upload(user: Dict[str, Any]):
         st.session_state["pdf_page_idx"] = 0
 
     # 1. Stepper at Top
-    has_active_doc = bool(st.session_state.get("active_sample_file") or st.session_state.get("uploaded_file_cache"))
+    has_active_doc = bool(st.session_state.get("active_sample_file") or st.session_state.get("uploaded_file_cache") or st.session_state.get("batch_chunk_files"))
     current_step = 2 if has_active_doc else 1
     components.render_stepper(current_step=current_step)
 
@@ -205,7 +415,7 @@ def render_upload(user: Dict[str, Any]):
             ("Sample 05 — Discount & Tax Multi-Step Math (Pass)", "sample_05_with_discount_tax.pdf"),
             ("Sample 06 — European Format (EUR / Comma Separator)", "sample_06_european_format.pdf"),
         ]
-        s_col1, s_col2, s_col3 = st.columns([2.5, 1.2, 1.3])
+        s_col1, s_col2, s_col3, s_col4 = st.columns([2.0, 1.1, 1.4, 1.0])
         with s_col1:
             selected_sample_label = st.selectbox(
                 "Choose test invoice:",
@@ -217,7 +427,7 @@ def render_upload(user: Dict[str, Any]):
         selected_file_stem = next((opt[1] for opt in sample_options if opt[0] == selected_sample_label), None)
 
         with s_col2:
-            if st.button("Load Test Sample", type="secondary", use_container_width=True, disabled=selected_file_stem is None):
+            if st.button("Load Single Sample", type="secondary", use_container_width=True, disabled=selected_file_stem is None):
                 target_path = sample_dir / selected_file_stem
                 if target_path.exists():
                     st.session_state["active_sample_file"] = {
@@ -226,15 +436,33 @@ def render_upload(user: Dict[str, Any]):
                         "type": "application/pdf" if target_path.suffix.lower() == ".pdf" else "image/png",
                     }
                     st.session_state.pop("uploaded_file_cache", None)
+                    st.session_state.pop("batch_chunk_files", None)
                     st.session_state["pdf_page_idx"] = 0
                     st.rerun()
 
         with s_col3:
+            if st.button("⚡ Ingest All 12 Samples (Batch)", type="secondary", use_container_width=True):
+                batch_files = []
+                for p in sorted(sample_dir.glob("sample_*.*")):
+                    if p.suffix.lower() in [".pdf", ".png"]:
+                        batch_files.append({
+                            "name": p.name,
+                            "bytes": p.read_bytes(),
+                            "size": p.stat().st_size,
+                            "type": "application/pdf" if p.suffix.lower() == ".pdf" else "image/png",
+                        })
+                st.session_state["batch_chunk_files"] = batch_files
+                st.session_state.pop("uploaded_file_cache", None)
+                st.session_state.pop("active_sample_file", None)
+                st.session_state["batch_verification_results"] = None
+                st.rerun()
+
+        with s_col4:
             try:
                 from src import generate_sample_invoices
                 zip_data = generate_sample_invoices.create_sample_zip()
                 st.download_button(
-                    "Download Pack (ZIP)",
+                    "Pack (ZIP)",
                     data=zip_data,
                     file_name="finvision_sample_invoices.zip",
                     mime="application/zip",
@@ -243,32 +471,90 @@ def render_upload(user: Dict[str, Any]):
             except Exception:
                 pass
 
-    # 3. Slim Dark Dropzone
-    uploaded_file = st.file_uploader(
-        "Upload Invoice Document (PDF, PNG, JPG up to 200MB)",
-        type=["jpg", "jpeg", "png", "pdf"],
-        accept_multiple_files=False,
-        help="Drag and drop any financial invoice scan or vector PDF.",
+    # 3. Slim Apple Dropzone with Multiple File & ZIP Archive Support
+    uploaded_files = st.file_uploader(
+        "Upload Invoices (PDF, PNG, JPG, or ZIP archive up to 200MB)",
+        type=["jpg", "jpeg", "png", "pdf", "zip"],
+        accept_multiple_files=True,
+        help="Drag and drop a single invoice scan, multiple invoices, or a ZIP archive containing invoices.",
     )
 
-    if uploaded_file is not None:
-        st.session_state["uploaded_file_cache"] = {
-            "name": uploaded_file.name,
-            "bytes": uploaded_file.getvalue(),
-            "type": uploaded_file.type,
-        }
-        st.session_state.pop("active_sample_file", None)
+    if uploaded_files:
+        parsed_files = []
+        for uf in uploaded_files:
+            fname = uf.name
+            fbytes = uf.getvalue()
+            if fname.lower().endswith(".zip"):
+                try:
+                    with zipfile.ZipFile(io.BytesIO(fbytes)) as z:
+                        for zname in z.namelist():
+                            if not zname.startswith("__MACOSX") and zname.lower().endswith((".pdf", ".png", ".jpg", ".jpeg")):
+                                content = z.read(zname)
+                                clean_name = Path(zname).name
+                                parsed_files.append({
+                                    "name": clean_name,
+                                    "bytes": content,
+                                    "size": len(content),
+                                    "type": "application/pdf" if clean_name.lower().endswith(".pdf") else "image/png"
+                                })
+                except Exception as ze:
+                    st.error(f"Error unpacking ZIP: {ze}")
+            else:
+                parsed_files.append({
+                    "name": fname,
+                    "bytes": fbytes,
+                    "size": len(fbytes),
+                    "type": uf.type,
+                })
+
+        if len(parsed_files) > 1:
+            st.session_state["batch_chunk_files"] = parsed_files
+            st.session_state.pop("active_sample_file", None)
+            st.session_state.pop("uploaded_file_cache", None)
+        elif len(parsed_files) == 1:
+            st.session_state["uploaded_file_cache"] = parsed_files[0]
+            st.session_state.pop("active_sample_file", None)
+            st.session_state.pop("batch_chunk_files", None)
+
+    # Check for Batch Mode vs Single Inspection Mode
+    batch_files = st.session_state.get("batch_chunk_files")
+    if batch_files and len(batch_files) > 1:
+        view_mode = st.radio(
+            "Workspace View Mode",
+            ["📦 Batch Chunk Ingestion Hub", "🔍 Detailed Document Inspector"],
+            horizontal=True,
+            label_visibility="collapsed",
+            key="upload_view_mode_toggle",
+        )
+        if view_mode == "📦 Batch Chunk Ingestion Hub":
+            render_batch_hub(batch_files, user, existing_docs)
+            return
+
+        # If Detailed Document Inspector selected during batch mode:
+        b_names = [f["name"] for f in batch_files]
+        current_active = st.session_state.get("uploaded_file_cache")
+        default_idx = b_names.index(current_active["name"]) if (current_active and current_active.get("name") in b_names) else 0
+
+        st.markdown("<div style='margin-bottom: 8px;'></div>", unsafe_allow_html=True)
+        sel_idx = st.selectbox(
+            "Select document from batch chunk to inspect:",
+            range(len(b_names)),
+            index=default_idx,
+            format_func=lambda i: f"📄 {b_names[i]} ({batch_files[i]['size'] / 1024:.1f} KB)",
+            key="batch_inspector_selector",
+        )
+        st.session_state["uploaded_file_cache"] = batch_files[sel_idx]
 
     active_file = st.session_state.get("uploaded_file_cache") or st.session_state.get("active_sample_file")
 
-    # If no file loaded: show clean empty state
+    # If no file loaded: show clean Apple empty state
     if not active_file:
         st.markdown(
             """
-            <div style="background: #121A2F; border: 1.5px dashed rgba(255,255,255,0.1); border-radius: 12px; padding: 48px 24px; text-align: center; margin-top: 10px;">
-                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#6366F1" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom: 12px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
-                <div style="font-weight: 700; font-size: 1.05rem; color: #F8FAFC; margin-bottom: 4px;">No Invoice Document Loaded</div>
-                <div style="font-size: 0.85rem; color: #94A3B8; max-width: 420px; margin: 0 auto 18px auto;">Drag and drop an invoice above, or open the sample drawer to evaluate instant test scenarios.</div>
+            <div style="background: rgba(28,28,30,0.6); backdrop-filter: blur(25px); border: 1.5px dashed rgba(255,255,255,0.15); border-radius: 18px; padding: 48px 24px; text-align: center; margin-top: 10px; box-shadow: 0 8px 32px rgba(0,0,0,0.3);">
+                <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#0071E3" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom: 14px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                <div style="font-weight: 700; font-size: 1.15rem; color: #F5F5F7; margin-bottom: 6px; letter-spacing: -0.02em;">No Invoices Loaded</div>
+                <div style="font-size: 0.88rem; color: #86868B; max-width: 440px; margin: 0 auto 18px auto; line-height: 1.5;">Upload a single invoice, drop a chunk of multiple invoices, or open the sample drawer above to evaluate instant test scenarios.</div>
             </div>
             """,
             unsafe_allow_html=True,

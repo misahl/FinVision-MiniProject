@@ -185,11 +185,11 @@ def render_app():
     with st.sidebar:
         st.markdown(
             """
-            <div style="padding: 10px 0 16px 0;">
-                <div style="font-weight: 800; color: #FFFFFF; font-size: 1.25rem; display: flex; align-items: center; gap: 8px;">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#6366F1" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            <div style="padding: 10px 0 18px 0;">
+                <div style="font-weight: 700; color: #F5F5F7; font-size: 1.25rem; display: flex; align-items: center; gap: 8px; letter-spacing: -0.024em;">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0071E3" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
                     <span>FinVision</span>
-                    <span style="font-size: 0.68rem; font-weight: 700; color: #818CF8; background: rgba(99,102,241,0.15); padding: 2px 6px; border-radius: 4px; border: 1px solid rgba(99,102,241,0.3);">2.0</span>
+                    <span style="font-size: 0.65rem; font-weight: 700; color: #2997FF; background: rgba(0,113,227,0.15); padding: 2px 8px; border-radius: 980px; border: 1px solid rgba(0,113,227,0.3); letter-spacing: 0.04em;">PRO</span>
                 </div>
             </div>
             """,
@@ -199,7 +199,7 @@ def render_app():
         current_page = st.session_state.get("nav_page", "Overview")
 
         # 1. Workflow Group
-        st.markdown("<div style='font-size: 0.7rem; font-weight: 700; color: #64748B; text-transform: uppercase; letter-spacing: 0.08em; margin: 10px 0 6px 4px;'>Workflow</div>", unsafe_allow_html=True)
+        st.markdown("<div style='font-size: 0.7rem; font-weight: 700; color: #86868B; text-transform: uppercase; letter-spacing: 0.08em; margin: 10px 0 6px 6px;'>Workflow</div>", unsafe_allow_html=True)
         workflow_pages = [
             ("Overview", "Overview"),
             ("Ingest & Verify", "Upload & Analyze"),
@@ -214,7 +214,7 @@ def render_app():
                 st.rerun()
 
         # 2. Insights Group
-        st.markdown("<div style='font-size: 0.7rem; font-weight: 700; color: #64748B; text-transform: uppercase; letter-spacing: 0.08em; margin: 16px 0 6px 4px;'>Insights</div>", unsafe_allow_html=True)
+        st.markdown("<div style='font-size: 0.7rem; font-weight: 700; color: #86868B; text-transform: uppercase; letter-spacing: 0.08em; margin: 16px 0 6px 6px;'>Insights</div>", unsafe_allow_html=True)
         insight_pages = [
             ("Risk Analytics", "Risk Analytics"),
             ("Audit History", "Document History"),
@@ -228,7 +228,7 @@ def render_app():
                 st.rerun()
 
         # 3. System Group
-        st.markdown("<div style='font-size: 0.7rem; font-weight: 700; color: #64748B; text-transform: uppercase; letter-spacing: 0.08em; margin: 16px 0 6px 4px;'>System</div>", unsafe_allow_html=True)
+        st.markdown("<div style='font-size: 0.7rem; font-weight: 700; color: #86868B; text-transform: uppercase; letter-spacing: 0.08em; margin: 16px 0 6px 6px;'>System</div>", unsafe_allow_html=True)
         system_pages = [("Settings", "Settings")]
         if user.get("role") == "admin":
             system_pages.append(("Administration", "Administration"))
@@ -243,15 +243,15 @@ def render_app():
         st.markdown("<div style='margin-top: 32px;'></div>", unsafe_allow_html=True)
         st.markdown(
             f"""
-            <div style="background: #121A2F; border-radius: 10px; padding: 12px; margin-bottom: 12px; border: 1px solid rgba(255,255,255,0.08);">
+            <div style="background: rgba(28,28,30,0.65); backdrop-filter: blur(20px); border-radius: 14px; padding: 14px; margin-bottom: 12px; border: 1px solid rgba(255,255,255,0.12); box-shadow: inset 0 1px 0 0 rgba(255,255,255,0.1);">
                 <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 6px;">
-                    <span style="width: 7px; height: 7px; background-color: #10B981; border-radius: 50%; box-shadow: 0 0 6px #10B981; display: inline-block;"></span>
-                    <span style="font-size: 0.72rem; font-weight: 600; color: #34D399;">Operational</span>
+                    <span style="width: 7px; height: 7px; background-color: #30D158; border-radius: 50%; box-shadow: 0 0 8px #30D158; display: inline-block;"></span>
+                    <span style="font-size: 0.72rem; font-weight: 600; color: #30D158;">Operational</span>
                 </div>
-                <div style="font-weight: 700; color: #F8FAFC; font-size: 0.85rem;">{user.get('displayName', 'Analyst')}</div>
-                <div style="color: #64748B; font-size: 0.74rem; word-break: break-all;">{user.get('email', '')}</div>
-                <div style="margin-top: 6px;">
-                    <span class="badge-low" style="font-size: 0.68rem; padding: 1px 7px;">{user.get('role', 'analyst').upper()}</span>
+                <div style="font-weight: 700; color: #F5F5F7; font-size: 0.88rem;">{user.get('displayName', 'Analyst')}</div>
+                <div style="color: #86868B; font-size: 0.74rem; word-break: break-all;">{user.get('email', '')}</div>
+                <div style="margin-top: 8px;">
+                    <span class="badge-low" style="font-size: 0.68rem; padding: 2px 8px;">{user.get('role', 'analyst').upper()}</span>
                 </div>
             </div>
             """,
