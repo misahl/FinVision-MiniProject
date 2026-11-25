@@ -41,8 +41,12 @@ def run_pipeline_on_bytes(
     # 2. Preprocessing
     deskewed_bgr, binary_img, proc_log, img_meta = image_processing.preprocess_image(file_bytes)
 
-    # 3. Tesseract OCR & Layout-Aware Field Extraction
-    words, raw_text, overall_conf = ocr.run_ocr(binary_img)
+    # 3. Multi-Engine Text & Word Extraction (Native Vector PDF + High-Accuracy OCR)
+    words, raw_text, overall_conf = ocr.extract_document_words(
+        source=file_bytes,
+        mime_type=mime_type,
+        fallback_image=deskewed_bgr,
+    )
     extracted = ocr.extract_invoice_fields(words, raw_text, overall_conf)
     extracted_dict = extracted.to_dict()
 
@@ -141,28 +145,119 @@ def render_upload(user: Dict[str, Any]):
     owner_uid = None if user.get("role") == "admin" else user.get("uid")
     existing_docs = firebase_service.list_documents(owner_uid=owner_uid, limit=100)
 
+    # -------------------------------------------------------------------------
+    # Quick Test Pack & Sample Invoices Loader
+    # -------------------------------------------------------------------------
+    sample_dir = Path(__file__).resolve().parent.parent / "sample_invoices"
+    with st.expander("⚡ Pre-Loaded Test Invoices Pack (Instant Testing Without Searching Files)", expanded=True):
+        st.markdown(
+            "Select any representative synthetic test invoice below to immediately test FinVision's verification rules, "
+            "arithmetic validation, duplicate collision detection, and AI risk scoring."
+        )
+
+        sample_options = [
+            ("-- Select a test scenario --", None),
+            ("1. Sample 01 — Clean Valid Invoice (Pass / Low Risk / Verified)", "sample_01_valid_invoice.pdf"),
+            ("2. Sample 02 — Arithmetic Mismatch (Flagged / High Risk / Math Discrepancy)", "sample_02_math_mismatch.pdf"),
+            ("3. Sample 03 — Duplicate Invoice Collision (Flagged / High Risk / Duplicate)", "sample_03_duplicate_invoice.pdf"),
+            ("4. Sample 04 — Missing Required Fields (Warning / Medium Risk / Missing Metadata)", "sample_04_missing_fields.pdf"),
+            ("5. Sample 05 — Discount & Tax Calculation (Pass / Low Risk / Multi-Step Math)", "sample_05_with_discount_tax.pdf"),
+            ("6. Sample 06 — European Format (Pass / Low Risk / EUR & Comma Separator)", "sample_06_european_format.pdf"),
+        ]
+
+        col_s1, col_s2, col_s3 = st.columns([2.5, 1.2, 1.3])
+        with col_s1:
+            selected_sample_label = st.selectbox(
+                "Choose Test Invoice Scenario:",
+                [opt[0] for opt in sample_options],
+                index=0,
+                key="sample_scenario_select",
+            )
+        
+        selected_file_stem = next((opt[1] for opt in sample_options if opt[0] == selected_sample_label), None)
+
+        with col_s2:
+            st.write("")
+            st.write("")
+            if st.button("⚡ Load Sample Document", type="primary", use_container_width=True, disabled=selected_file_stem is None):
+                target_path = sample_dir / selected_file_stem
+                if target_path.exists():
+                    st.session_state["active_sample_file"] = {
+                        "name": target_path.name,
+                        "bytes": target_path.read_bytes(),
+                        "type": "application/pdf" if target_path.suffix.lower() == ".pdf" else "image/png",
+                    }
+                    st.rerun()
+
+        with col_s3:
+            st.write("")
+            st.write("")
+            try:
+                from src import generate_sample_invoices
+                zip_data = generate_sample_invoices.create_sample_zip()
+                st.download_button(
+                    "📦 Download Test Pack (ZIP)",
+                    data=zip_data,
+                    file_name="finvision_sample_invoices.zip",
+                    mime="application/zip",
+                    use_container_width=True,
+                    help="Download all PDF and PNG sample invoices to your local drive.",
+                )
+            except Exception as e:
+                st.caption(f"ZIP generator: {e}")
+
+        if st.session_state.get("active_sample_file"):
+            st.success(f"✓ Currently active test invoice: `{st.session_state['active_sample_file']['name']}`")
+            if st.button("✖ Clear Loaded Sample", type="secondary"):
+                st.session_state.pop("active_sample_file", None)
+                st.rerun()
+
+    # -------------------------------------------------------------------------
+    # File Uploader
+    # -------------------------------------------------------------------------
     uploaded_files = st.file_uploader(
-        "Upload Invoice Document (PDF, PNG, JPEG)",
+        "Or Upload Your Own Invoice Document (PDF, PNG, JPEG)",
         type=["jpg", "jpeg", "png", "pdf"],
         accept_multiple_files=True,
         help="Select one or more financial documents up to 10MB each.",
     )
 
+    # Determine active files: user uploads take precedence, otherwise active sample
+    active_files = []
     if uploaded_files:
-        st.markdown(f"**{len(uploaded_files)} file(s) selected for processing.**")
+        for f in uploaded_files:
+            active_files.append({"name": f.name, "bytes": f.getvalue(), "type": f.type})
+    elif st.session_state.get("active_sample_file"):
+        active_files.append(st.session_state["active_sample_file"])
 
-        # If single file, show interactive analyst verification workspace with editable preview
-        if len(uploaded_files) == 1:
-            file_obj = uploaded_files[0]
-            file_bytes = file_obj.getvalue()
-            filename = file_obj.name
+    if active_files:
+        st.markdown(f"**{len(active_files)} document(s) ready for verification.**")
+
+        # Single document verification workspace
+        if len(active_files) == 1:
+            file_meta = active_files[0]
+            filename = file_meta["name"]
+            file_bytes = file_meta["bytes"]
+            mime_type = file_meta.get("type") or image_processing.detect_mime_type(file_bytes)
 
             col_preview, col_audit = st.columns([1, 1.2])
 
             with col_preview:
                 st.markdown("### Document Preview")
-                if file_obj.type == "application/pdf":
+                if mime_type == "application/pdf":
                     st.info(f"📄 PDF Document: **{filename}** ({len(file_bytes) / 1024:.1f} KB)")
+                    try:
+                        import pymupdf
+                        doc = pymupdf.open(stream=file_bytes, filetype="pdf")
+                        if len(doc) > 0:
+                            page = doc[0]
+                            pix = page.get_pixmap(dpi=150)
+                            img_data = pix.tobytes("png")
+                            pil_img = Image.open(io.BytesIO(img_data))
+                            st.image(pil_img, caption=f"{filename} (Page 1)", use_container_width=True)
+                        doc.close()
+                    except Exception as e:
+                        st.caption(f"Preview render: {e}")
                 else:
                     try:
                         pil_img = Image.open(io.BytesIO(file_bytes))
@@ -174,14 +269,28 @@ def render_upload(user: Dict[str, Any]):
                 st.markdown("### Extracted Fields & Analyst Review")
                 st.caption("Review extracted financial data. You may correct any OCR misreads before final persistence.")
 
-                # Run extraction pass
-                with st.spinner("Extracting invoice fields via Tesseract OCR..."):
-                    mime_type = image_processing.detect_mime_type(file_bytes)
-                    _, binary_img, _, _ = image_processing.preprocess_image(file_bytes)
-                    words, raw_text, overall_conf = ocr.run_ocr(binary_img)
-                    extracted = ocr.extract_invoice_fields(words, raw_text, overall_conf)
-                    ext_data = extracted.to_dict()
-                    f = ext_data["fields"]
+                # Run extraction pass safely
+                with st.spinner("Extracting invoice data via FinVision OCR & document engine..."):
+                    try:
+                        detected_mime = image_processing.detect_mime_type(file_bytes)
+                        deskewed_bgr, binary_img, _, _ = image_processing.preprocess_image(file_bytes)
+                        words, raw_text, overall_conf = ocr.extract_document_words(
+                            source=file_bytes,
+                            mime_type=detected_mime,
+                            fallback_image=deskewed_bgr,
+                        )
+                        extracted = ocr.extract_invoice_fields(words, raw_text, overall_conf)
+                        ext_data = extracted.to_dict()
+                        f = ext_data["fields"]
+                        if words:
+                            st.success(f"✓ Extracted {len(words)} words ({overall_conf:.1f}% confidence)")
+                        else:
+                            st.info("ℹ️ Minimal text detected automatically. Please verify or complete fields below.")
+                    except Exception as ex:
+                        st.warning(f"⚠️ Text extraction note: {ex}. Please review fields below.")
+                        ext_data = {"fields": {}, "lineItems": [], "fieldConfidence": {}}
+                        f = ext_data["fields"]
+                        words, raw_text, overall_conf = [], "", 0.0
 
                 with st.form("analyst_correction_form"):
                     c_f1, c_f2 = st.columns(2)
@@ -191,10 +300,10 @@ def render_upload(user: Dict[str, Any]):
                         f_date = st.text_input("Invoice Date (YYYY-MM-DD)", value=f.get("date") or "")
                         f_due = st.text_input("Due Date (YYYY-MM-DD)", value=f.get("dueDate") or "")
                     with c_f2:
-                        f_sub = st.number_input("Subtotal ($)", value=float(f.get("subtotal") or 0.0), step=10.0, format="%.2f")
-                        f_tax = st.number_input("Tax / VAT ($)", value=float(f.get("tax") or 0.0), step=5.0, format="%.2f")
-                        f_disc = st.number_input("Discount ($)", value=float(f.get("discount") or 0.0), step=5.0, format="%.2f")
-                        f_tot = st.number_input("Total Amount ($)", value=float(f.get("total") or 0.0), step=10.0, format="%.2f")
+                        f_sub = st.number_input("Subtotal", value=float(f.get("subtotal") or 0.0), step=10.0, format="%.2f")
+                        f_tax = st.number_input("Tax / VAT", value=float(f.get("tax") or 0.0), step=5.0, format="%.2f")
+                        f_disc = st.number_input("Discount", value=float(f.get("discount") or 0.0), step=5.0, format="%.2f")
+                        f_tot = st.number_input("Total Amount", value=float(f.get("total") or 0.0), step=10.0, format="%.2f")
 
                     submit_verify = st.form_submit_button("🚀 Run Full Multi-Stage Verification & Save", type="primary", use_container_width=True)
 
@@ -232,24 +341,24 @@ def render_upload(user: Dict[str, Any]):
 
         else:
             # Batch upload processing
-            if st.button(f"⚡ Ingest & Process All {len(uploaded_files)} Documents in Batch", type="primary"):
+            if st.button(f"⚡ Ingest & Process All {len(active_files)} Documents in Batch", type="primary"):
                 progress_bar = st.progress(0)
                 status_text = st.empty()
                 results = []
 
-                for i, file_obj in enumerate(uploaded_files):
-                    status_text.text(f"Processing ({i+1}/{len(uploaded_files)}): {file_obj.name}...")
+                for i, file_obj in enumerate(active_files):
+                    status_text.text(f"Processing ({i+1}/{len(active_files)}): {file_obj['name']}...")
                     try:
                         res = run_pipeline_on_bytes(
-                            filename=file_obj.name,
-                            file_bytes=file_obj.getvalue(),
+                            filename=file_obj["name"],
+                            file_bytes=file_obj["bytes"],
                             user=user,
                             existing_docs=existing_docs + results,
                         )
                         results.append(res)
                     except Exception as e:
-                        st.error(f"Error processing {file_obj.name}: {e}")
-                    progress_bar.progress((i + 1) / len(uploaded_files))
+                        st.error(f"Error processing {file_obj['name']}: {e}")
+                    progress_bar.progress((i + 1) / len(active_files))
 
                 status_text.text("✓ Batch processing complete!")
                 st.success(f"Successfully processed and verified {len(results)} invoice(s)!")

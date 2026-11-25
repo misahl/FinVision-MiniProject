@@ -176,6 +176,11 @@ def standardize_date(date_str: str) -> Optional[str]:
         "%b %d, %Y",
         "%d %B %Y",
         "%d %b %Y",
+        "%d-%b-%Y",
+        "%d.%m.%Y",
+        "%Y.%m.%d",
+        "%B %d %Y",
+        "%b %d %Y",
     ]
 
     for fmt in formats:
@@ -212,7 +217,12 @@ def detect_currency(text: str) -> str:
 # -------------------------------------------------------------------------
 
 def run_ocr(image: Union[np.ndarray, Image.Image]) -> Tuple[List[Dict[str, Any]], str, float]:
-    """Run Tesseract OCR via pytesseract.image_to_data.
+    """Run Tesseract OCR via pytesseract.image_to_data safely.
+    
+    Guarantees:
+    - Never throws AttributeError on empty or float text columns.
+    - Gracefully catches TesseractNotFoundError or OS subprocess errors without crashing.
+    - If initial thresholded image yields 0 words, falls back to grayscale for robust OCR.
     
     Returns:
       (valid_words_list, raw_text, overall_confidence)
@@ -222,28 +232,154 @@ def run_ocr(image: Union[np.ndarray, Image.Image]) -> Tuple[List[Dict[str, Any]]
     else:
         pil_img = image
 
-    data = pytesseract.image_to_data(pil_img, output_type=pytesseract.Output.DATAFRAME)
-    
-    # Filter rows with empty text or invalid confidence
-    valid = data[data.text.notna() & (data.text.str.strip() != "") & (data.conf >= 0)].copy()
+    def _ocr_pass(img_to_run: Image.Image) -> Tuple[List[Dict[str, Any]], str, float]:
+        try:
+            data = pytesseract.image_to_data(img_to_run, output_type=pytesseract.Output.DATAFRAME)
+            if data is None or data.empty:
+                return [], "", 0.0
 
-    words: List[Dict[str, Any]] = []
-    for _, row in valid.iterrows():
-        words.append({
-            "text": str(row["text"]).strip(),
-            "conf": float(row["conf"]),
-            "left": int(row["left"]),
-            "top": int(row["top"]),
-            "width": int(row["width"]),
-            "height": int(row["height"]),
-            "line_num": int(row.get("line_num", 0)),
-            "block_num": int(row.get("block_num", 0)),
-        })
+            # Safe type normalization
+            if "text" in data.columns:
+                data["text"] = data["text"].astype(str)
+            else:
+                return [], "", 0.0
 
-    overall_conf = float(valid["conf"].mean()) if not valid.empty else 0.0
-    raw_text = " ".join(w["text"] for w in words)
+            if "conf" in data.columns:
+                data["conf"] = pd.to_numeric(data["conf"], errors="coerce").fillna(-1.0)
+            else:
+                data["conf"] = -1.0
+
+            # Filter rows with empty text or invalid confidence
+            valid = data[(~data["text"].isin(["", "nan", "None"])) & (data["text"].str.strip() != "") & (data["conf"] >= 0)].copy()
+            if valid.empty:
+                return [], "", 0.0
+
+            words: List[Dict[str, Any]] = []
+            for _, row in valid.iterrows():
+                words.append({
+                    "text": str(row["text"]).strip(),
+                    "conf": float(row["conf"]),
+                    "left": int(row["left"]),
+                    "top": int(row["top"]),
+                    "width": int(row["width"]),
+                    "height": int(row["height"]),
+                    "line_num": int(row.get("line_num", 0)),
+                    "block_num": int(row.get("block_num", 0)),
+                })
+
+            overall_conf = float(valid["conf"].mean()) if not valid.empty else 0.0
+            raw_text = " ".join(w["text"] for w in words)
+            return words, raw_text, overall_conf
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning("Tesseract OCR execution error: %s", e)
+            return [], "", 0.0
+
+    words, raw_text, overall_conf = _ocr_pass(pil_img)
+    # If 0 words found and image mode is not grayscale, try L mode
+    if not words and pil_img.mode != "L":
+        words, raw_text, overall_conf = _ocr_pass(pil_img.convert("L"))
 
     return words, raw_text, overall_conf
+
+
+def extract_words_from_pdf(
+    pdf_source: Union[bytes, str, Path],
+    page_num: int = 0,
+    dpi: int = 300,
+) -> Tuple[List[Dict[str, Any]], str, float]:
+    """Extract native vector text and word bounding boxes directly from PDF via PyMuPDF.
+    
+    Provides 100% character precision on native digital invoices without relying on OCR.
+    Returns:
+      (words_list, raw_text, confidence)
+    """
+    import pymupdf
+
+    try:
+        if isinstance(pdf_source, (str, Path)):
+            doc = pymupdf.open(str(pdf_source))
+        else:
+            doc = pymupdf.open(stream=pdf_source, filetype="pdf")
+
+        if len(doc) == 0:
+            return [], "", 0.0
+
+        page_index = max(0, min(page_num, len(doc) - 1))
+        page = doc[page_index]
+        raw_words = page.get_text("words")
+        doc.close()
+
+        if not raw_words:
+            return [], "", 0.0
+
+        zoom = dpi / 72.0
+        words: List[Dict[str, Any]] = []
+
+        for w in raw_words:
+            txt = str(w[4]).strip()
+            if not txt:
+                continue
+            words.append({
+                "text": txt,
+                "conf": 99.0,
+                "left": int(w[0] * zoom),
+                "top": int(w[1] * zoom),
+                "width": max(1, int((w[2] - w[0]) * zoom)),
+                "height": max(1, int((w[3] - w[1]) * zoom)),
+                "line_num": int(w[6]),
+                "block_num": int(w[5]),
+            })
+
+        raw_text = " ".join(w["text"] for w in words)
+        return words, raw_text, 99.0
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning("PyMuPDF native text extraction error: %s", e)
+        return [], "", 0.0
+
+
+def extract_document_words(
+    source: Union[bytes, str, Path, np.ndarray, Image.Image],
+    mime_type: Optional[str] = None,
+    page_num: int = 0,
+    fallback_image: Optional[np.ndarray] = None,
+) -> Tuple[List[Dict[str, Any]], str, float]:
+    """Unified multi-engine document text extractor.
+    
+    1. If source is PDF: first attempts native digital vector extraction via PyMuPDF.
+       If native text is present (>= 5 words), returns directly with 99% confidence.
+       If scanned / empty (< 5 words), falls back to OCR on the rasterized image.
+    2. If source is an image array / bytes: runs OCR with graceful error handling.
+    """
+    is_pdf = False
+    if mime_type == "application/pdf":
+        is_pdf = True
+    elif isinstance(source, bytes) and source.startswith(b"%PDF"):
+        is_pdf = True
+    elif isinstance(source, (str, Path)) and str(source).lower().endswith(".pdf"):
+        is_pdf = True
+
+    if is_pdf and isinstance(source, (bytes, str, Path)):
+        pdf_words, pdf_raw, pdf_conf = extract_words_from_pdf(source, page_num=page_num)
+        if len(pdf_words) >= 5:
+            return pdf_words, pdf_raw, pdf_conf
+
+    # Use fallback image or load image
+    if fallback_image is not None:
+        return run_ocr(fallback_image)
+
+    if isinstance(source, (np.ndarray, Image.Image)):
+        return run_ocr(source)
+
+    try:
+        from src.image_processing import load_image_from_source
+        img_bgr, _ = load_image_from_source(source, pdf_page=page_num)
+        return run_ocr(img_bgr)
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning("Unified document word extraction failed: %s", e)
+        return [], "", 0.0
 
 
 def cluster_words_into_lines(words: List[Dict[str, Any]]) -> List[List[Dict[str, Any]]]:
@@ -313,20 +449,19 @@ def extract_invoice_fields(
     inv.currency = detect_currency(full_text)
 
     # 1. Invoice Number Heuristic:
-    # Match labels 'Invoice no:', 'Invoice #:', 'Invoice Number:', 'Inv #:'
     inv_num_patterns = [
-        r"Invoice\s*(?:no|number|#|id)?[:\s]*([A-Z0-9\-_/]+)",
-        r"Inv\s*#?[:\s]*([A-Z0-9\-_/]+)",
-        r"Bill\s*(?:no|#)?[:\s]*([A-Z0-9\-_/]+)",
+        r"\b(?:Invoice|Inv|Bill)\s*(?:no\.?|number|#|id)?\s*[:#]\s*([A-Za-z0-9\-_/]+)",
+        r"\b(?:Invoice|Inv|Bill)\s+(?:no\.?|number|#|id)\s+([A-Za-z0-9\-_/]+)",
+        r"\b(INV-[A-Za-z0-9\-_/]+)\b",
+        r"\b([A-Z]{2,4}-\d{3,8})\b",
     ]
     for pattern in inv_num_patterns:
         m = re.search(pattern, full_text, re.IGNORECASE)
         if m:
             candidate = m.group(1).strip()
             # Must contain at least one digit and be at least 3 chars
-            if len(candidate) >= 3 and any(ch.isdigit() for ch in candidate):
+            if len(candidate) >= 3 and any(ch.isdigit() for ch in candidate) and candidate.lower() not in ["invoice", "inv", "bill"]:
                 inv.invoice_number = candidate
-                # Calculate confidence from matching words
                 matched_words = [w for w in words if candidate in w["text"]]
                 inv.field_confidence["invoiceNumber"] = (
                     round(float(np.mean([w["conf"] for w in matched_words])), 2)
@@ -335,11 +470,14 @@ def extract_invoice_fields(
                 break
 
     # 2. Date Heuristic:
-    # Look for 'Date of issue:', 'Invoice Date:', 'Date:' or date patterns near top
     date_patterns = [
-        r"(?:Date\s*(?:of\s*issue)?|Invoice\s*Date|Date|Dated)[:\s]*([0-9]{1,4}[/\-\.][0-9]{1,2}[/\-\.][0-9]{1,4})",
-        r"\b([0-9]{2}/[0-9]{2}/[0-9]{4})\b",
+        r"\b(?:Date\s*(?:of\s*issue)?|Invoice\s*Date|Date|Dated)\s*[:#]?\s*([0-9]{1,4}[/\-\.][0-9]{1,2}[/\-\.][0-9]{1,4})",
+        r"\b(?:Date\s*(?:of\s*issue)?|Invoice\s*Date|Date|Dated)\s*[:#]?\s*([A-Za-z]{3,9}\s+\d{1,2},?\s+\d{4})",
         r"\b([0-9]{4}-[0-9]{2}-[0-9]{2})\b",
+        r"\b([0-9]{2}/[0-9]{2}/[0-9]{4})\b",
+        r"\b([0-9]{2}\.[0-9]{2}\.[0-9]{4})\b",
+        r"\b([0-9]{2}-[A-Za-z]{3}-[0-9]{4})\b",
+        r"\b([A-Za-z]{3,9}\s+\d{1,2},?\s+\d{4})\b",
     ]
     for pattern in date_patterns:
         m = re.search(pattern, full_text, re.IGNORECASE)
@@ -357,7 +495,9 @@ def extract_invoice_fields(
 
     # 2b. Due Date Heuristic:
     due_date_patterns = [
-        r"(?:Due\s*Date|Payment\s*Due|Pay\s*By|Due\s*By)[:\s]*([0-9]{1,4}[/\-\.][0-9]{1,2}[/\-\.][0-9]{1,4})",
+        r"\b(?:Due\s*Date|Payment\s*Due|Pay\s*By|Due\s*By)\s*[:#]?\s*([0-9]{1,4}[/\-\.][0-9]{1,2}[/\-\.][0-9]{1,4})",
+        r"\b(?:Due\s*Date|Payment\s*Due|Pay\s*By|Due\s*By)\s*[:#]?\s*([A-Za-z]{3,9}\s+\d{1,2},?\s+\d{4})",
+        r"\b(?:Due\s*Date|Payment\s*Due|Pay\s*By|Due\s*By)\s*[:#]?\s*([0-9]{2}\.[0-9]{2}\.[0-9]{4})",
     ]
     for pattern in due_date_patterns:
         m = re.search(pattern, full_text, re.IGNORECASE)
@@ -370,13 +510,10 @@ def extract_invoice_fields(
                 break
 
     # 3. Vendor & Customer Heuristic (Multi-column aware):
-    # Many invoices have side-by-side 'Seller:' and 'Client:' or 'Bill To:'
     for i, line_str in enumerate(line_strings):
         if "seller:" in line_str.lower() and "client:" in line_str.lower() and i + 1 < len(lines):
-            # The next line contains: [Seller Words (left)] ... [Client Words (right)]
             next_line = lines[i + 1]
             if next_line:
-                # Find midpoint X
                 mid_x = np.median([w["left"] for w in next_line])
                 seller_words = [w for w in next_line if w["left"] < mid_x]
                 client_words = [w for w in next_line if w["left"] >= mid_x]
@@ -388,43 +525,65 @@ def extract_invoice_fields(
                     inv.field_confidence["customer"] = round(float(np.mean([w["conf"] for w in client_words])), 2)
             break
         elif "seller:" in line_str.lower() and not inv.vendor and i + 1 < len(lines):
-            # Vertical Seller label
             next_line = lines[i + 1]
             inv.vendor = " ".join(w["text"] for w in next_line[:4])
             inv.field_confidence["vendor"] = round(float(np.mean([w["conf"] for w in next_line[:4]])), 2)
         elif "client:" in line_str.lower() and not inv.customer and i + 1 < len(lines):
-            # Vertical Client label
             next_line = lines[i + 1]
             inv.customer = " ".join(w["text"] for w in next_line[:4])
             inv.field_confidence["customer"] = round(float(np.mean([w["conf"] for w in next_line[:4]])), 2)
 
     # Fallback vendor / customer heuristics
     if not inv.vendor:
-        m = re.search(r"(?:From|Vendor|Supplier)[:\s]+([^\n\r]+)", full_text, re.IGNORECASE)
+        m = re.search(r"\b(?:From|Vendor|Supplier|Seller)\s*[:#]\s*([^\n\r]+)", full_text, re.IGNORECASE)
         if m:
-            inv.vendor = m.group(1).strip()
-            inv.field_confidence["vendor"] = round(overall_conf, 2)
+            cand = m.group(1).strip()
+            cand = re.split(r"\b(?:Invoice|Date|Bill\s*To|Client|Total)\b", cand, flags=re.IGNORECASE)[0].strip()
+            if len(cand) >= 2:
+                inv.vendor = cand
+                inv.field_confidence["vendor"] = round(overall_conf, 2)
+
+    # Top-of-page prominent business header heuristic
+    if not inv.vendor:
+        for line in lines[:3]:
+            line_str = " ".join(w["text"] for w in line).strip()
+            cand = re.sub(r"\b(?:INVOICE|RECEIPT|TAX\s*INVOICE|STATEMENT)\b", "", line_str, flags=re.IGNORECASE).strip()
+            if len(cand) >= 3 and not re.match(r"^\d+", cand) and not any(k in cand.lower() for k in ["bill to", "due date", "date:"]):
+                if not re.search(r"\b(?:Street|St\.|Drive|Dr\.|Avenue|Ave\.|Boulevard|Blvd\.|Road|Rd\.)\b", cand, re.IGNORECASE):
+                    inv.vendor = cand
+                    inv.field_confidence["vendor"] = round(overall_conf, 2)
+                    break
 
     if not inv.customer:
-        m = re.search(r"(?:Bill\s*To|Sold\s*To|Client|Customer)[:\s]+([^\n\r]+)", full_text, re.IGNORECASE)
+        m = re.search(r"\b(?:Bill\s*To|Sold\s*To|Client|Customer)\s*[:#]?\s*([^\n\r]+)", full_text, re.IGNORECASE)
         if m:
-            inv.customer = m.group(1).strip()
-            inv.field_confidence["customer"] = round(overall_conf, 2)
+            cand = m.group(1).strip()
+            cand = re.split(r"\b(?:Invoice|Date|Due|Total|Tax|Subtotal)\b", cand, flags=re.IGNORECASE)[0].strip()
+            if len(cand) >= 2:
+                inv.customer = cand
+                inv.field_confidence["customer"] = round(overall_conf, 2)
+
+    if not inv.customer:
+        for i, line_str in enumerate(line_strings):
+            if re.search(r"\b(?:Bill\s*To|Sold\s*To|Client|Customer)\b", line_str, re.IGNORECASE):
+                if i + 1 < len(lines):
+                    next_txt = " ".join(w["text"] for w in lines[i+1]).strip()
+                    if len(next_txt) >= 2 and not any(k in next_txt.lower() for k in ["subtotal", "total", "tax", "date", "invoice", "description"]):
+                        inv.customer = next_txt
+                        inv.field_confidence["customer"] = round(overall_conf, 2)
+                        break
 
     # Pattern to match monetary amounts with optional space, comma, or dot thousands separators
-    # e.g., 5 640,17 | 1,234.56 | 627,00 | 232.95 | 1 394,67
-    money_pat = r"\b\d{1,3}(?:[\s,]\d{3})*(?:[,\.]\d{2})\b"
+    money_pat = r"\b\d{1,3}(?:[\.,\s]\d{3})*(?:[,\.]\d{2})\b|\b\d+(?:[,\.]\d{2})\b|\b\d{2,6}\b"
 
     # 4. Financial Totals Heuristic (Summary table & keyword matching):
-    # Scan lines from bottom to top for Summary / Total sections
     for line in reversed(lines):
         line_txt = " ".join(w["text"] for w in line)
+        low_txt = line_txt.lower()
 
         # Multi-value summary line: 'Total $ 211,77 $ 21,18 $ 232,95'
-        # or 'Total $ 5 640,17 $ 564,02 $ 6 204,19'
         numbers = re.findall(money_pat, line_txt)
-        if "total" in line_txt.lower() and len(numbers) >= 3 and inv.total is None:
-            # 3 numbers in summary row: Net Worth (Subtotal), Tax (VAT), Gross Worth (Total)
+        if "total" in low_txt and len(numbers) >= 3 and inv.total is None:
             vals = [parse_decimal_amount(n) for n in numbers if parse_decimal_amount(n) is not None]
             if len(vals) >= 3:
                 inv.subtotal = vals[0]
@@ -434,20 +593,9 @@ def extract_invoice_fields(
                 inv.field_confidence["subtotal"] = inv.field_confidence["total"]
                 inv.field_confidence["tax"] = inv.field_confidence["total"]
 
-        # Look for tax rate (e.g. '10%', '20%') in any summary or table line
-        if inv.tax_rate is None and "%" in line_txt:
-            pct_match = re.search(r"(\d+(?:\.\d+)?)\s*%", line_txt)
-            if pct_match:
-                try:
-                    pct = (Decimal(pct_match.group(1)) / Decimal(100)).quantize(Decimal("0.01"))
-                    inv.tax_rate = pct
-                    inv.field_confidence["taxRate"] = round(float(np.mean([w["conf"] for w in line])), 2)
-                except InvalidOperation:
-                    pass
-
         # Standalone Total
-        if inv.total is None and any(k in line_txt.lower() for k in ["total", "gross worth", "amount due", "balance"]):
-            if "subtotal" not in line_txt.lower() and "vat" not in line_txt.lower():
+        if inv.total is None and any(k in low_txt for k in ["total amount", "total", "gross worth", "amount due", "balance"]):
+            if "subtotal" not in low_txt and "vat" not in low_txt and "tax" not in low_txt:
                 amt = re.findall(money_pat, line_txt)
                 if amt:
                     val = parse_decimal_amount(amt[-1])
@@ -456,7 +604,7 @@ def extract_invoice_fields(
                         inv.field_confidence["total"] = round(float(np.mean([w["conf"] for w in line])), 2)
 
         # Standalone Subtotal
-        if inv.subtotal is None and any(k in line_txt.lower() for k in ["subtotal", "sub total", "net worth", "net amount"]):
+        if inv.subtotal is None and any(k in low_txt for k in ["subtotal", "sub total", "net worth", "net amount"]):
             amt = re.findall(money_pat, line_txt)
             if amt:
                 val = parse_decimal_amount(amt[-1])
@@ -465,7 +613,7 @@ def extract_invoice_fields(
                     inv.field_confidence["subtotal"] = round(float(np.mean([w["conf"] for w in line])), 2)
 
         # Standalone Discount
-        if inv.discount is None and any(k in line_txt.lower() for k in ["discount", "less discount", "rebate"]):
+        if inv.discount is None and any(k in low_txt for k in ["discount", "less discount", "rebate"]):
             amt = re.findall(money_pat, line_txt)
             if amt:
                 val = parse_decimal_amount(amt[-1])
@@ -474,14 +622,13 @@ def extract_invoice_fields(
                     inv.field_confidence["discount"] = round(float(np.mean([w["conf"] for w in line])), 2)
 
         # Standalone Tax / VAT
-        if inv.tax is None and any(k in line_txt.lower() for k in ["tax", "vat", "gst"]):
-            if "%" not in line_txt:
-                amt = re.findall(money_pat, line_txt)
-                if amt:
-                    val = parse_decimal_amount(amt[-1])
-                    if val is not None:
-                        inv.tax = val
-                        inv.field_confidence["tax"] = round(float(np.mean([w["conf"] for w in line])), 2)
+        if inv.tax is None and any(k in low_txt for k in ["tax", "vat", "gst"]):
+            amt = re.findall(money_pat, line_txt)
+            if amt:
+                val = parse_decimal_amount(amt[-1])
+                if val is not None:
+                    inv.tax = val
+                    inv.field_confidence["tax"] = round(float(np.mean([w["conf"] for w in line])), 2)
 
         # Tax Rate (e.g. '10%', '20%')
         if inv.tax_rate is None and "%" in line_txt:
