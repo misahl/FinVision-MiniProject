@@ -276,13 +276,13 @@ def render_batch_hub(batch_files: List[Dict[str, Any]], user: Dict[str, Any], ex
                     "doc_item": doc_item,
                 })
         st.session_state["batch_verification_results"] = batch_results
-        st.toast(f"Batch completed: {len(batch_results)} invoices verified!", icon="✓")
+        st.toast(f"Batch completed: {len(batch_results)} invoices verified!", icon="✅")
         st.rerun()
 
     # Results Table if processed
     results = st.session_state.get("batch_verification_results")
     if results:
-        st.markdown("<hr style='border-color: rgba(255,255,255,0.1); margin: 24px 0 16px 0;'>", unsafe_allow_html=True)
+        st.markdown("<hr style='border-color: rgba(0,0,0,0.08); margin: 24px 0 16px 0;'>", unsafe_allow_html=True)
 
         low_count = len([r for r in results if r.get("risk_level") == "LOW"])
         med_count = len([r for r in results if r.get("risk_level") == "MEDIUM"])
