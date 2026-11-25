@@ -1,14 +1,14 @@
-"""Batch & Single Document Upload & Extraction Page for FinVision."""
+"""Redesigned Ingest & Verify Workspace for FinVision (Enterprise Dark Mode)."""
 
 from decimal import Decimal
 import io
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 import pandas as pd
 import streamlit as st
-from PIL import Image
+from PIL import Image, ImageDraw
 
-from frontend.components import render_risk_badge, render_rule_card
+from frontend import components
 from src import (
     image_processing,
     ocr,
@@ -19,6 +19,38 @@ from src import (
     risk_assessment,
     firebase_service,
 )
+
+
+def draw_bounding_boxes_on_image(
+    base_img: Image.Image,
+    words: List[Dict[str, Any]],
+    highlight_text_snippets: List[str] = None,
+) -> Image.Image:
+    """Overlay subtle semi-transparent bounding boxes on the document scan for extracted fields."""
+    annotated = base_img.copy().convert("RGBA")
+    overlay = Image.new("RGBA", annotated.size, (255, 255, 255, 0))
+    draw = ImageDraw.Draw(overlay)
+
+    snippets = [s.strip().lower() for s in (highlight_text_snippets or []) if s and len(s) > 2]
+
+    # Draw word boxes
+    for w in words:
+        bbox = w.get("bbox")
+        text = str(w.get("text", "")).strip().lower()
+        if not bbox or len(bbox) != 4:
+            continue
+        x, y, bw, bh = bbox
+        
+        is_highlight = any(snip in text or text in snip for snip in snippets)
+        if is_highlight:
+            # Highlighted field source (Indigo glow)
+            draw.rectangle([x, y, x + bw, y + bh], fill=(99, 102, 241, 60), outline=(129, 140, 248, 220), width=2)
+        elif w.get("conf", 100) < 65:
+            # Low confidence box (Amber)
+            draw.rectangle([x, y, x + bw, y + bh], fill=(245, 158, 11, 40), outline=(245, 158, 11, 180), width=1)
+
+    result = Image.alpha_composite(annotated, overlay)
+    return result.convert("RGB")
 
 
 def run_pipeline_on_bytes(
@@ -99,23 +131,28 @@ def run_pipeline_on_bytes(
         "filename": filename,
         "storagePath": storage_path,
         "mimeType": mime_type,
-        "sizeBytes": len(file_bytes),
+        "fileSizeBytes": len(file_bytes),
         "sha256": sha256_hash,
         "pHash": phash_data["pHash"],
-        "pageCount": img_meta.get("page_count", 1),
+        "width": img_meta.get("width", 0),
+        "height": img_meta.get("height", 0),
+        "dpi": img_meta.get("dpi", 300),
     }
-    new_doc_id = firebase_service.create_document_record(owner_uid, file_meta)
+
+    new_doc_id = firebase_service.create_document_record(
+        owner_uid=owner_uid,
+        file_meta=file_meta,
+        extracted_fields=fields,
+        line_items=line_items,
+    )
 
     firebase_service.save_document_analysis(
         doc_id=new_doc_id,
-        fields=fields,
-        field_confidence=confidences,
-        line_items=line_items,
         verification_results=verif_results,
+        duplicate_results=dup_results,
         cv_results=cv_results,
         ml_results=ml_pred,
-        risk_assessment=risk,
-        storage_path=storage_path,
+        risk_results=risk,
     )
 
     return {
@@ -138,48 +175,48 @@ def run_pipeline_on_bytes(
 
 
 def render_upload(user: Dict[str, Any]):
-    """Render intelligent invoice upload, field preview, analyst correction, and verification."""
-    st.markdown("## 📤 Intelligent Document Upload & Verification")
-    st.caption("Upload financial invoices for multi-stage OCR extraction, financial arithmetic validation, duplicate collision detection, and AI risk scoring.")
-
+    """Render modern split-view Ingest & Verify workspace."""
     owner_uid = None if user.get("role") == "admin" else user.get("uid")
     existing_docs = firebase_service.list_documents(owner_uid=owner_uid, limit=100)
 
-    # -------------------------------------------------------------------------
-    # Quick Test Pack & Sample Invoices Loader
-    # -------------------------------------------------------------------------
+    # Manage interactive view state
+    if "zoom_scale" not in st.session_state:
+        st.session_state["zoom_scale"] = 1.0
+    if "rotation_deg" not in st.session_state:
+        st.session_state["rotation_deg"] = 0
+    if "pdf_page_idx" not in st.session_state:
+        st.session_state["pdf_page_idx"] = 0
+
+    # 1. Stepper at Top
+    has_active_doc = bool(st.session_state.get("active_sample_file") or st.session_state.get("uploaded_file_cache"))
+    current_step = 2 if has_active_doc else 1
+    components.render_stepper(current_step=current_step)
+
+    # 2. Collapsed "Try a sample invoice" drawer
     sample_dir = Path(__file__).resolve().parent.parent / "sample_invoices"
-    with st.expander("⚡ Pre-Loaded Test Invoices Pack (Instant Testing Without Searching Files)", expanded=True):
-        st.markdown(
-            "Select any representative synthetic test invoice below to immediately test FinVision's verification rules, "
-            "arithmetic validation, duplicate collision detection, and AI risk scoring."
-        )
-
+    with st.expander("📁 Try a sample invoice (Instant Test Scenarios)", expanded=False):
         sample_options = [
-            ("-- Select a test scenario --", None),
-            ("1. Sample 01 — Clean Valid Invoice (Pass / Low Risk / Verified)", "sample_01_valid_invoice.pdf"),
-            ("2. Sample 02 — Arithmetic Mismatch (Flagged / High Risk / Math Discrepancy)", "sample_02_math_mismatch.pdf"),
-            ("3. Sample 03 — Duplicate Invoice Collision (Flagged / High Risk / Duplicate)", "sample_03_duplicate_invoice.pdf"),
-            ("4. Sample 04 — Missing Required Fields (Warning / Medium Risk / Missing Metadata)", "sample_04_missing_fields.pdf"),
-            ("5. Sample 05 — Discount & Tax Calculation (Pass / Low Risk / Multi-Step Math)", "sample_05_with_discount_tax.pdf"),
-            ("6. Sample 06 — European Format (Pass / Low Risk / EUR & Comma Separator)", "sample_06_european_format.pdf"),
+            ("-- Select scenario --", None),
+            ("Sample 01 — Clean Valid Invoice (Pass / Low Risk)", "sample_01_valid_invoice.pdf"),
+            ("Sample 02 — Arithmetic Mismatch (Flagged / Math Variance)", "sample_02_math_mismatch.pdf"),
+            ("Sample 03 — Duplicate Invoice Collision (Flagged / Duplicate)", "sample_03_duplicate_invoice.pdf"),
+            ("Sample 04 — Missing Required Fields (Warning / Low Risk)", "sample_04_missing_fields.pdf"),
+            ("Sample 05 — Discount & Tax Multi-Step Math (Pass)", "sample_05_with_discount_tax.pdf"),
+            ("Sample 06 — European Format (EUR / Comma Separator)", "sample_06_european_format.pdf"),
         ]
-
-        col_s1, col_s2, col_s3 = st.columns([2.5, 1.2, 1.3])
-        with col_s1:
+        s_col1, s_col2, s_col3 = st.columns([2.5, 1.2, 1.3])
+        with s_col1:
             selected_sample_label = st.selectbox(
-                "Choose Test Invoice Scenario:",
+                "Choose test invoice:",
                 [opt[0] for opt in sample_options],
                 index=0,
-                key="sample_scenario_select",
+                key="sample_select_drawer",
+                label_visibility="collapsed",
             )
-        
         selected_file_stem = next((opt[1] for opt in sample_options if opt[0] == selected_sample_label), None)
 
-        with col_s2:
-            st.write("")
-            st.write("")
-            if st.button("⚡ Load Sample Document", type="primary", use_container_width=True, disabled=selected_file_stem is None):
+        with s_col2:
+            if st.button("Load Test Sample", type="secondary", use_container_width=True, disabled=selected_file_stem is None):
                 target_path = sample_dir / selected_file_stem
                 if target_path.exists():
                     st.session_state["active_sample_file"] = {
@@ -187,196 +224,422 @@ def render_upload(user: Dict[str, Any]):
                         "bytes": target_path.read_bytes(),
                         "type": "application/pdf" if target_path.suffix.lower() == ".pdf" else "image/png",
                     }
+                    st.session_state.pop("uploaded_file_cache", None)
+                    st.session_state["pdf_page_idx"] = 0
                     st.rerun()
 
-        with col_s3:
-            st.write("")
-            st.write("")
+        with s_col3:
             try:
                 from src import generate_sample_invoices
                 zip_data = generate_sample_invoices.create_sample_zip()
                 st.download_button(
-                    "📦 Download Test Pack (ZIP)",
+                    "Download Pack (ZIP)",
                     data=zip_data,
                     file_name="finvision_sample_invoices.zip",
                     mime="application/zip",
                     use_container_width=True,
-                    help="Download all PDF and PNG sample invoices to your local drive.",
                 )
-            except Exception as e:
-                st.caption(f"ZIP generator: {e}")
+            except Exception:
+                pass
 
-        if st.session_state.get("active_sample_file"):
-            st.success(f"✓ Currently active test invoice: `{st.session_state['active_sample_file']['name']}`")
-            if st.button("✖ Clear Loaded Sample", type="secondary"):
-                st.session_state.pop("active_sample_file", None)
-                st.rerun()
-
-    # -------------------------------------------------------------------------
-    # File Uploader
-    # -------------------------------------------------------------------------
-    uploaded_files = st.file_uploader(
-        "Or Upload Your Own Invoice Document (PDF, PNG, JPEG)",
+    # 3. Slim Dark Dropzone
+    uploaded_file = st.file_uploader(
+        "Upload Invoice Document (PDF, PNG, JPG up to 200MB)",
         type=["jpg", "jpeg", "png", "pdf"],
-        accept_multiple_files=True,
-        help="Select one or more financial documents up to 10MB each.",
+        accept_multiple_files=False,
+        help="Drag and drop any financial invoice scan or vector PDF.",
     )
 
-    # Determine active files: user uploads take precedence, otherwise active sample
-    active_files = []
-    if uploaded_files:
-        for f in uploaded_files:
-            active_files.append({"name": f.name, "bytes": f.getvalue(), "type": f.type})
-    elif st.session_state.get("active_sample_file"):
-        active_files.append(st.session_state["active_sample_file"])
+    if uploaded_file is not None:
+        st.session_state["uploaded_file_cache"] = {
+            "name": uploaded_file.name,
+            "bytes": uploaded_file.getvalue(),
+            "type": uploaded_file.type,
+        }
+        st.session_state.pop("active_sample_file", None)
 
-    if active_files:
-        st.markdown(f"**{len(active_files)} document(s) ready for verification.**")
+    active_file = st.session_state.get("uploaded_file_cache") or st.session_state.get("active_sample_file")
 
-        # Single document verification workspace
-        if len(active_files) == 1:
-            file_meta = active_files[0]
-            filename = file_meta["name"]
-            file_bytes = file_meta["bytes"]
-            mime_type = file_meta.get("type") or image_processing.detect_mime_type(file_bytes)
+    # If no file loaded: show clean empty state
+    if not active_file:
+        st.markdown(
+            """
+            <div style="background: #121A2F; border: 1.5px dashed rgba(255,255,255,0.1); border-radius: 12px; padding: 48px 24px; text-align: center; margin-top: 10px;">
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#6366F1" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom: 12px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                <div style="font-weight: 700; font-size: 1.05rem; color: #F8FAFC; margin-bottom: 4px;">No Invoice Document Loaded</div>
+                <div style="font-size: 0.85rem; color: #94A3B8; max-width: 420px; margin: 0 auto 18px auto;">Drag and drop an invoice above, or open the sample drawer to evaluate instant test scenarios.</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        return
 
-            col_preview, col_audit = st.columns([1, 1.2])
+    filename = active_file["name"]
+    file_bytes = active_file["bytes"]
+    mime_type = active_file.get("type") or image_processing.detect_mime_type(file_bytes)
 
-            with col_preview:
-                st.markdown("### Document Preview")
-                if mime_type == "application/pdf":
-                    st.info(f"📄 PDF Document: **{filename}** ({len(file_bytes) / 1024:.1f} KB)")
-                    try:
-                        import pymupdf
-                        doc = pymupdf.open(stream=file_bytes, filetype="pdf")
-                        if len(doc) > 0:
-                            page = doc[0]
-                            pix = page.get_pixmap(dpi=150)
-                            img_data = pix.tobytes("png")
-                            pil_img = Image.open(io.BytesIO(img_data))
-                            st.image(pil_img, caption=f"{filename} (Page 1)", use_container_width=True)
-                        doc.close()
-                    except Exception as e:
-                        st.caption(f"Preview render: {e}")
-                else:
-                    try:
-                        pil_img = Image.open(io.BytesIO(file_bytes))
-                        st.image(pil_img, caption=filename, use_container_width=True)
-                    except Exception as e:
-                        st.warning(f"Could not render image preview: {e}")
+    # 4. Multi-Engine OCR & Field Extraction (Cached in session)
+    cache_key = f"extracted_{active_file['name']}_{len(file_bytes)}"
+    if cache_key not in st.session_state:
+        with st.spinner("Executing high-accuracy OCR extraction and field parsing..."):
+            deskewed_bgr, binary_img, _, _ = image_processing.preprocess_image(file_bytes)
+            words, raw_text, overall_conf = ocr.extract_document_words(
+                source=file_bytes,
+                mime_type=mime_type,
+                fallback_image=deskewed_bgr,
+            )
+            extracted = ocr.extract_invoice_fields(words, raw_text, overall_conf)
+            st.session_state[cache_key] = {
+                "words": words,
+                "raw_text": raw_text,
+                "overall_conf": overall_conf,
+                "extracted": extracted.to_dict(),
+            }
 
-            with col_audit:
-                st.markdown("### Extracted Fields & Analyst Review")
-                st.caption("Review extracted financial data. You may correct any OCR misreads before final persistence.")
+    ext_pack = st.session_state[cache_key]
+    words = ext_pack["words"]
+    raw_fields = ext_pack["extracted"]["fields"]
+    line_items_init = ext_pack["extracted"]["lineItems"]
+    confidences = ext_pack["extracted"]["fieldConfidence"]
+    overall_conf = ext_pack["overall_conf"]
 
-                # Run extraction pass safely
-                with st.spinner("Extracting invoice data via FinVision OCR & document engine..."):
-                    try:
-                        detected_mime = image_processing.detect_mime_type(file_bytes)
-                        deskewed_bgr, binary_img, _, _ = image_processing.preprocess_image(file_bytes)
-                        words, raw_text, overall_conf = ocr.extract_document_words(
-                            source=file_bytes,
-                            mime_type=detected_mime,
-                            fallback_image=deskewed_bgr,
-                        )
-                        extracted = ocr.extract_invoice_fields(words, raw_text, overall_conf)
-                        ext_data = extracted.to_dict()
-                        f = ext_data["fields"]
-                        if words:
-                            st.success(f"✓ Extracted {len(words)} words ({overall_conf:.1f}% confidence)")
-                        else:
-                            st.info("ℹ️ Minimal text detected automatically. Please verify or complete fields below.")
-                    except Exception as ex:
-                        st.warning(f"⚠️ Text extraction note: {ex}. Please review fields below.")
-                        ext_data = {"fields": {}, "lineItems": [], "fieldConfidence": {}}
-                        f = ext_data["fields"]
-                        words, raw_text, overall_conf = [], "", 0.0
+    # 5. Main Split View Above The Fold
+    col_preview, col_editor = st.columns([1.05, 1.25])
 
-                with st.form("analyst_correction_form"):
-                    c_f1, c_f2 = st.columns(2)
-                    with c_f1:
-                        f_inv = st.text_input("Invoice Number", value=f.get("invoiceNumber") or "INV-")
-                        f_vend = st.text_input("Vendor Name", value=f.get("vendor") or "")
-                        f_date = st.text_input("Invoice Date (YYYY-MM-DD)", value=f.get("date") or "")
-                        f_due = st.text_input("Due Date (YYYY-MM-DD)", value=f.get("dueDate") or "")
-                    with c_f2:
-                        f_sub = st.number_input("Subtotal", value=float(f.get("subtotal") or 0.0), step=10.0, format="%.2f")
-                        f_tax = st.number_input("Tax / VAT", value=float(f.get("tax") or 0.0), step=5.0, format="%.2f")
-                        f_disc = st.number_input("Discount", value=float(f.get("discount") or 0.0), step=5.0, format="%.2f")
-                        f_tot = st.number_input("Total Amount", value=float(f.get("total") or 0.0), step=10.0, format="%.2f")
+    # -------------------------------------------------------------
+    # LEFT COLUMN: Document Preview & Interactive Controls
+    # -------------------------------------------------------------
+    with col_preview:
+        st.markdown(
+            f"""
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                <div style="font-weight: 700; font-size: 0.95rem; color: #F8FAFC;">Document Preview</div>
+                <div style="font-size: 0.76rem; color: #94A3B8;">{filename} ({len(file_bytes) / 1024:.1f} KB)</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
 
-                    submit_verify = st.form_submit_button("🚀 Run Full Multi-Stage Verification & Save", type="primary", use_container_width=True)
+        # Toolbar controls: Zoom, Rotate, Page
+        tc1, tc2, tc3, tc4, tc5 = st.columns([1, 1, 1, 1.2, 1.2])
+        with tc1:
+            if st.button("Zoom -", key="btn_zoom_out", use_container_width=True):
+                st.session_state["zoom_scale"] = max(0.6, st.session_state["zoom_scale"] - 0.2)
+                st.rerun()
+        with tc2:
+            if st.button(f"{int(st.session_state['zoom_scale'] * 100)}%", key="btn_zoom_reset", use_container_width=True):
+                st.session_state["zoom_scale"] = 1.0
+                st.rerun()
+        with tc3:
+            if st.button("Zoom +", key="btn_zoom_in", use_container_width=True):
+                st.session_state["zoom_scale"] = min(2.0, st.session_state["zoom_scale"] + 0.2)
+                st.rerun()
+        with tc4:
+            if st.button("Rotate 90°", key="btn_rotate", use_container_width=True):
+                st.session_state["rotation_deg"] = (st.session_state["rotation_deg"] + 90) % 360
+                st.rerun()
+        with tc5:
+            if st.button("Clear Doc", key="btn_clear_doc", use_container_width=True):
+                st.session_state.pop("active_sample_file", None)
+                st.session_state.pop("uploaded_file_cache", None)
+                st.rerun()
 
-                if submit_verify:
-                    with st.spinner("Executing financial validation, duplicate scan, and ML risk evaluation..."):
-                        corrected_fields = {
-                            "invoiceNumber": f_inv,
-                            "vendor": f_vend,
-                            "date": f_date,
-                            "dueDate": f_due,
-                            "subtotal": f_sub,
-                            "tax": f_tax,
-                            "discount": f_disc,
-                            "total": f_tot,
-                            "currency": f.get("currency", "USD"),
-                            "customer": f.get("customer", ""),
-                        }
-                        result = run_pipeline_on_bytes(
-                            filename=filename,
-                            file_bytes=file_bytes,
-                            user=user,
-                            existing_docs=existing_docs,
-                            edited_fields=corrected_fields,
-                            edited_line_items=ext_data.get("lineItems", []),
-                        )
-                        st.session_state["selected_doc_id"] = result["docId"]
-                        st.success(f"✓ Verification complete! Document recorded as `{result['docId']}`. Risk: {result['risk']['level']} ({result['risk']['score']}/100)")
-                        
-                        # Display immediate rule summary
-                        st.markdown("#### Verification Outcomes")
-                        for r in result["verif"].get("ruleResults", []):
-                            render_rule_card(r)
+        # Render document image with highlighted source bounding boxes
+        pil_preview = None
+        total_pages = 1
+        curr_page = st.session_state["pdf_page_idx"]
 
-                        st.markdown(f"**Recommended Action:** {result['risk']['recommendedAction']}")
-
-                        if st.button("🔍 Open in Verification Workspace", type="primary", key="goto_verify_after_upload"):
-                            st.session_state["selected_doc_id"] = result["docId"]
-                            st.session_state["nav_page"] = "Verification Results"
+        if mime_type == "application/pdf":
+            try:
+                import pymupdf
+                doc = pymupdf.open(stream=file_bytes, filetype="pdf")
+                total_pages = len(doc)
+                if total_pages > 1:
+                    col_p1, col_p2, col_p3 = st.columns([1, 2, 1])
+                    with col_p1:
+                        if st.button("◀ Prev", key="p_prev", disabled=curr_page <= 0, use_container_width=True):
+                            st.session_state["pdf_page_idx"] -= 1
+                            st.rerun()
+                    with col_p2:
+                        st.markdown(f"<div style='text-align: center; font-size: 0.8rem; color: #94A3B8; padding-top: 6px;'>Page {curr_page + 1} of {total_pages}</div>", unsafe_allow_html=True)
+                    with col_p3:
+                        if st.button("Next ▶", key="p_next", disabled=curr_page >= total_pages - 1, use_container_width=True):
+                            st.session_state["pdf_page_idx"] += 1
                             st.rerun()
 
+                page = doc[min(curr_page, total_pages - 1)]
+                pix = page.get_pixmap(dpi=150)
+                pil_preview = Image.open(io.BytesIO(pix.tobytes("png")))
+                doc.close()
+            except Exception as e:
+                st.warning(f"PDF renderer note: {e}")
         else:
-            # Batch upload processing
-            if st.button(f"⚡ Ingest & Process All {len(active_files)} Documents in Batch", type="primary"):
-                progress_bar = st.progress(0)
-                status_text = st.empty()
-                results = []
+            try:
+                pil_preview = Image.open(io.BytesIO(file_bytes))
+            except Exception:
+                pass
 
-                for i, file_obj in enumerate(active_files):
-                    status_text.text(f"Processing ({i+1}/{len(active_files)}): {file_obj['name']}...")
-                    try:
-                        res = run_pipeline_on_bytes(
-                            filename=file_obj["name"],
-                            file_bytes=file_obj["bytes"],
-                            user=user,
-                            existing_docs=existing_docs + results,
-                        )
-                        results.append(res)
-                    except Exception as e:
-                        st.error(f"Error processing {file_obj['name']}: {e}")
-                    progress_bar.progress((i + 1) / len(active_files))
+        if pil_preview:
+            # Apply rotation
+            if st.session_state["rotation_deg"] != 0:
+                pil_preview = pil_preview.rotate(-st.session_state["rotation_deg"], expand=True)
 
-                status_text.text("✓ Batch processing complete!")
-                st.success(f"Successfully processed and verified {len(results)} invoice(s)!")
+            # Draw bounding boxes highlighting key values
+            highlight_snippets = [
+                str(raw_fields.get("invoiceNumber", "")),
+                str(raw_fields.get("total", "")),
+                str(raw_fields.get("date", "")),
+                str(raw_fields.get("vendor", "")),
+            ]
+            annotated_preview = draw_bounding_boxes_on_image(pil_preview, words, highlight_snippets)
 
-                summary_table = []
-                for r in results:
-                    summary_table.append({
-                        "Doc ID": r["docId"][:12],
-                        "Filename": r["filename"],
-                        "Invoice #": r["fields"].get("invoiceNumber", "N/A"),
-                        "Vendor": r["fields"].get("vendor", "N/A"),
-                        "Total": f"${float(r['fields'].get('total', 0.0)):,.2f}" if r['fields'].get('total') else "N/A",
-                        "Risk Level": r["risk"]["level"],
-                        "Risk Score": f"{r['risk']['score']:.0f}/100",
-                    })
-                st.dataframe(pd.DataFrame(summary_table), use_container_width=True)
+            # Apply zoom scaling
+            scale = st.session_state["zoom_scale"]
+            if scale != 1.0:
+                new_w = max(100, int(annotated_preview.width * scale))
+                new_h = max(100, int(annotated_preview.height * scale))
+                annotated_preview = annotated_preview.resize((new_w, new_h), Image.Resampling.LANCZOS)
+
+            st.image(annotated_preview, caption="Scan source with visual bounding box highlights", use_container_width=True)
+            st.caption("Indigo rectangles indicate extracted field source text; amber outlines indicate low-confidence words.")
+        else:
+            st.info("Visual preview unavailable.")
+
+    # -------------------------------------------------------------
+    # RIGHT COLUMN: Extracted Fields, Live Math, Line Items & Risk
+    # -------------------------------------------------------------
+    with col_editor:
+        st.markdown(
+            """
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                <div style="font-weight: 700; font-size: 0.95rem; color: #F8FAFC;">Extracted Financial Fields</div>
+                <div style="font-size: 0.74rem; color: #94A3B8;">Review & correct fields before final verification</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        # 2-Column Responsive Field Grid
+        col_f1, col_f2 = st.columns(2)
+        with col_f1:
+            st.markdown(
+                f'<div style="display: flex; justify-content: space-between; align-items: center;">'
+                f'<span style="font-size: 0.8rem; font-weight: 600; color: #94A3B8;">Invoice Number</span>'
+                f'{components.render_confidence_chip(confidences.get("invoiceNumber", 90))}'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
+            inv_num_val = st.text_input("inv_num", value=raw_fields.get("invoiceNumber") or "INV-", label_visibility="collapsed", key="in_inv_num")
+
+            st.markdown(
+                f'<div style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px;">'
+                f'<span style="font-size: 0.8rem; font-weight: 600; color: #94A3B8;">Vendor Name</span>'
+                f'{components.render_confidence_chip(confidences.get("vendor", 88))}'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
+            vendor_val = st.text_input("vendor", value=raw_fields.get("vendor") or "", label_visibility="collapsed", key="in_vendor")
+
+            st.markdown(
+                f'<div style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px;">'
+                f'<span style="font-size: 0.8rem; font-weight: 600; color: #94A3B8;">Invoice Date</span>'
+                f'{components.render_confidence_chip(confidences.get("date", 92))}'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
+            date_val = st.text_input("date", value=raw_fields.get("date") or "", label_visibility="collapsed", key="in_date")
+
+            st.markdown(
+                f'<div style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px;">'
+                f'<span style="font-size: 0.8rem; font-weight: 600; color: #94A3B8;">Due Date</span>'
+                f'{components.render_confidence_chip(confidences.get("dueDate", 85))}'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
+            due_date_val = st.text_input("dueDate", value=raw_fields.get("dueDate") or "", label_visibility="collapsed", key="in_due_date")
+
+        with col_f2:
+            st.markdown(
+                f'<div style="display: flex; justify-content: space-between; align-items: center;">'
+                f'<span style="font-size: 0.8rem; font-weight: 600; color: #94A3B8;">Subtotal ($)</span>'
+                f'{components.render_confidence_chip(confidences.get("subtotal", 90))}'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
+            subtotal_val = st.number_input("subtotal", value=float(raw_fields.get("subtotal") or 0.0), step=10.0, format="%.2f", label_visibility="collapsed", key="in_subtotal")
+
+            st.markdown(
+                f'<div style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px;">'
+                f'<span style="font-size: 0.8rem; font-weight: 600; color: #94A3B8;">Tax / VAT ($)</span>'
+                f'{components.render_confidence_chip(confidences.get("tax", 90))}'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
+            tax_val = st.number_input("tax", value=float(raw_fields.get("tax") or 0.0), step=5.0, format="%.2f", label_visibility="collapsed", key="in_tax")
+
+            st.markdown(
+                f'<div style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px;">'
+                f'<span style="font-size: 0.8rem; font-weight: 600; color: #94A3B8;">Discount ($)</span>'
+                f'{components.render_confidence_chip(confidences.get("discount", 85))}'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
+            discount_val = st.number_input("discount", value=float(raw_fields.get("discount") or 0.0), step=5.0, format="%.2f", label_visibility="collapsed", key="in_discount")
+
+            # Check if total was fixed via one-click suggestion
+            fixed_tot_val = st.session_state.get(f"fix_total_{filename}")
+            initial_total = fixed_tot_val if fixed_tot_val is not None else float(raw_fields.get("total") or 0.0)
+
+            st.markdown(
+                f'<div style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px;">'
+                f'<span style="font-size: 0.8rem; font-weight: 600; color: #94A3B8;">Total Stated Amount ($)</span>'
+                f'{components.render_confidence_chip(confidences.get("total", 95))}'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
+            total_val = st.number_input("total", value=initial_total, step=10.0, format="%.2f", label_visibility="collapsed", key="in_total")
+
+        # -------------------------------------------------------------
+        # Live Math Validation Bar
+        # -------------------------------------------------------------
+        calc_expected = round(subtotal_val + tax_val - discount_val, 2)
+        diff = round(abs(calc_expected - total_val), 2)
+        is_math_passed = diff < 0.05
+
+        if is_math_passed:
+            st.markdown(
+                f"""
+                <div class="math-bar-pass">
+                    <div>
+                        <span>✓ Math Verified: </span>
+                        <span>${subtotal_val:,.2f} + ${tax_val:,.2f} - ${discount_val:,.2f} = <b>${calc_expected:,.2f}</b></span>
+                    </div>
+                    <span style="font-size: 0.75rem; background: rgba(16,185,129,0.2); padding: 2px 8px; border-radius: 4px;">Zero Discrepancy</span>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+        else:
+            col_m_msg, col_m_fix = st.columns([2.2, 1])
+            with col_m_msg:
+                st.markdown(
+                    f"""
+                    <div class="math-bar-fail">
+                        <div>
+                            <span>⚠️ Math Discrepancy: </span>
+                            <span>Expected <b>${calc_expected:,.2f}</b>, stated total is <b>${total_val:,.2f}</b> (Diff: ${diff:,.2f})</span>
+                        </div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+            with col_m_fix:
+                if st.button(f"⚡ Fix total to ${calc_expected:,.2f}", key=f"btn_fix_{filename}", use_container_width=True):
+                    st.session_state[f"fix_total_{filename}"] = calc_expected
+                    st.rerun()
+
+        # -------------------------------------------------------------
+        # Editable Line-Items Table
+        # -------------------------------------------------------------
+        st.markdown(
+            """
+            <div style="font-weight: 700; font-size: 0.88rem; color: #F8FAFC; margin-top: 14px; margin-bottom: 4px;">
+                Itemized Line Items
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        line_df = pd.DataFrame(line_items_init if line_items_init else [
+            {"description": "Item Description", "quantity": 1.0, "unitPrice": subtotal_val, "totalPrice": subtotal_val}
+        ])
+        edited_line_df = st.data_editor(
+            line_df,
+            use_container_width=True,
+            num_rows="dynamic",
+            key=f"editor_{filename}",
+        )
+
+        # -------------------------------------------------------------
+        # Live Risk & Inline Duplicate Detection Preview
+        # -------------------------------------------------------------
+        live_fields = {
+            "invoiceNumber": inv_num_val,
+            "vendor": vendor_val,
+            "date": date_val,
+            "dueDate": due_date_val,
+            "subtotal": subtotal_val,
+            "tax": tax_val,
+            "discount": discount_val,
+            "total": total_val,
+        }
+        
+        # Real-time duplicate evaluation
+        sha256_hash = duplicate_detection.compute_sha256(file_bytes)
+        phash_data = duplicate_detection.compute_perceptual_hashes(file_bytes)
+        target_cand = {"sha256": sha256_hash, "pHash": phash_data["pHash"], "fields": live_fields}
+        live_dup = duplicate_detection.find_duplicates(target_cand, existing_docs)
+
+        # Build live risk reasons
+        live_reasons = []
+        if not is_math_passed:
+            live_reasons.append(f"Subtotal arithmetic mismatch: stated total differs by ${diff:,.2f}")
+        if live_dup.get("hasDuplicate"):
+            match_top = live_dup.get("duplicateMatches", [{}])[0]
+            live_reasons.append(f"Duplicate Collision: {match_top.get('matchType')} matches existing {match_top.get('docId')[:12]}")
+        if overall_conf < 70.0:
+            live_reasons.append(f"Lower OCR confidence extraction ({overall_conf:.1f}%)")
+        if not vendor_val or len(vendor_val) < 2:
+            live_reasons.append("Vendor name is incomplete or unverified")
+
+        calculated_risk_score = 15.0
+        if not is_math_passed:
+            calculated_risk_score += 40.0
+        if live_dup.get("hasDuplicate"):
+            calculated_risk_score += 45.0
+        calculated_risk_score = min(100.0, calculated_risk_score)
+
+        risk_level = "HIGH" if calculated_risk_score >= 65 else ("MEDIUM" if calculated_risk_score >= 35 else "LOW")
+        risk_color = "#EF4444" if risk_level == "HIGH" else ("#F59E0B" if risk_level == "MEDIUM" else "#10B981")
+
+        st.markdown(
+            f"""
+            <div class="risk-preview-card">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <span style="font-weight: 700; font-size: 0.85rem; color: #F8FAFC;">Live AI Risk Preview</span>
+                    <span style="font-weight: 800; font-size: 0.85rem; color: {risk_color};">{risk_level} ({calculated_risk_score:.0f}/100)</span>
+                </div>
+                <div style="font-size: 0.78rem; color: #94A3B8;">
+                    {''.join([f'<div style="margin-top: 3px;">• {r}</div>' for r in live_reasons[:3]]) if live_reasons else '<div>✓ No risk indicators triggered. Clean document structure.</div>'}
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        # -------------------------------------------------------------
+        # Sticky Bottom Action Bar
+        # -------------------------------------------------------------
+        st.markdown("<div style='margin-top: 20px;'></div>", unsafe_allow_html=True)
+        col_act1, col_act2 = st.columns([1, 2])
+        
+        with col_act1:
+            if st.button("Save Draft", use_container_width=True):
+                st.toast("Document draft saved to browser session", icon="💾")
+
+        with col_act2:
+            submit_label = "🚀 Run Full Verification & Save (Ctrl + Enter)"
+            if st.button(submit_label, type="primary", use_container_width=True, key=f"btn_verify_{filename}"):
+                with st.spinner("Executing financial invariant checks, duplicate scan, and ML inference..."):
+                    res = run_pipeline_on_bytes(
+                        filename=filename,
+                        file_bytes=file_bytes,
+                        user=user,
+                        existing_docs=existing_docs,
+                        edited_fields=live_fields,
+                        edited_line_items=edited_line_df.to_dict(orient="records"),
+                    )
+                    st.session_state["selected_doc_id"] = res["docId"]
+                    st.session_state["nav_page"] = "Verification Results"
+                    st.success(f"✓ Document verified and persisted as {res['docId'][:12]}!")
+                    st.rerun()

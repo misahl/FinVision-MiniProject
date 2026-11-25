@@ -1,21 +1,23 @@
 /* ===============================================================
-   FinVision 2.0 Ultra-Modern Fintech Design System (Linear / Stripe Inspired)
-   High-Contrast Executive Dark Palette, Micro-Interactions & Zero-Lag Layout
+   FinVision 2.0 Ultra-Modern Fintech Design System (Inter / Lucide Inspired)
+   High-Contrast Executive Dark Palette (#0B1020, #121A2F), Micro-Interactions
    =============================================================== */
 
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
 /* --- Root Variables --- */
 :root {
-    --bg-base: #0B0F19;
-    --bg-card: #111827;
-    --bg-card-hover: #172033;
+    --bg-base: #0B1020;
+    --bg-card: #121A2F;
+    --bg-card-hover: #18233E;
     --border-subtle: rgba(255, 255, 255, 0.08);
-    --border-hover: rgba(96, 165, 250, 0.35);
+    --border-hover: rgba(99, 102, 241, 0.4);
     --text-primary: #F8FAFC;
     --text-secondary: #94A3B8;
     --text-muted: #64748B;
+    --accent-indigo: #4F46E5;
     --accent-blue: #3B82F6;
+    --accent-teal: #14B8A6;
     --accent-emerald: #10B981;
     --accent-amber: #F59E0B;
     --accent-rose: #EF4444;
@@ -23,7 +25,7 @@
 
 /* --- Global Reset & Typography --- */
 html, body, [class*="css"], .stApp {
-    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
     background-color: var(--bg-base) !important;
     color: var(--text-primary) !important;
 }
@@ -40,12 +42,12 @@ h1, h2, h3, h4, h5, h6,
 section.main h1, section.main h2, section.main h3 {
     color: var(--text-primary) !important;
     font-weight: 700 !important;
-    letter-spacing: -0.025em !important;
+    letter-spacing: -0.02em !important;
 }
 
-.main h1 { font-size: 1.85rem !important; margin-bottom: 0.4rem !important; }
-.main h2 { font-size: 1.4rem !important; margin-top: 0.8rem !important; margin-bottom: 0.3rem !important; }
-.main h3 { font-size: 1.15rem !important; margin-top: 0.6rem !important; margin-bottom: 0.3rem !important; }
+.main h1 { font-size: 1.75rem !important; margin-bottom: 0.35rem !important; }
+.main h2 { font-size: 1.35rem !important; margin-top: 0.6rem !important; margin-bottom: 0.25rem !important; }
+.main h3 { font-size: 1.1rem !important; margin-top: 0.5rem !important; margin-bottom: 0.25rem !important; }
 
 .main p, .main span, .main div {
     color: var(--text-secondary);
@@ -56,18 +58,251 @@ section.main h1, section.main h2, section.main h3 {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    background: linear-gradient(180deg, rgba(17, 24, 39, 0.95) 0%, rgba(15, 23, 42, 0.85) 100%);
-    border: 1px solid var(--border-subtle);
-    border-radius: 14px;
-    padding: 12px 20px;
-    margin-bottom: 20px;
+    background: #121A2F !important;
+    border: 1px solid var(--border-subtle) !important;
+    border-radius: 12px;
+    padding: 10px 18px;
+    margin-bottom: 16px;
     box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.4);
-    backdrop-filter: blur(12px);
 }
 
-.fin-brand-title {
-    font-size: 1.25rem;
-    font-weight: 800;
+.fin-topbar-search {
+    display: flex;
+    align-items: center;
+    background: rgba(11, 16, 32, 0.8);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    padding: 6px 12px;
+    width: 280px;
+    cursor: text;
+}
+
+.fin-notification-bell {
+    position: relative;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.fin-bell-badge {
+    position: absolute;
+    top: -2px;
+    right: -2px;
+    background: #EF4444;
+    color: #FFFFFF;
+    font-size: 0.62rem;
+    font-weight: 700;
+    width: 15px;
+    height: 15px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* --- Lifecycle Stepper (Upload > Extract > Validate > Risk Score) --- */
+.fin-stepper {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: #121A2F;
+    border: 1px solid var(--border-subtle);
+    border-radius: 12px;
+    padding: 12px 24px;
+    margin-bottom: 16px;
+}
+
+.fin-step {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    opacity: 0.55;
+    transition: opacity 0.2s ease;
+}
+
+.fin-step.active {
+    opacity: 1.0;
+}
+
+.fin-step.completed {
+    opacity: 0.9;
+}
+
+.fin-step-circle {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: #1E293B;
+    border: 1.5px solid #475569;
+    color: #94A3B8;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.76rem;
+    font-weight: 700;
+}
+
+.fin-step.active .fin-step-circle {
+    background: #4F46E5;
+    border-color: #818CF8;
+    color: #FFFFFF;
+    box-shadow: 0 0 10px rgba(79, 70, 229, 0.5);
+}
+
+.fin-step.completed .fin-step-circle {
+    background: rgba(16, 185, 129, 0.2);
+    border-color: #10B981;
+    color: #34D399;
+}
+
+.fin-step-label {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #94A3B8;
+}
+
+.fin-step.active .fin-step-label {
+    color: #F8FAFC;
+    font-weight: 700;
+}
+
+.fin-step-line {
+    flex: 1;
+    height: 2px;
+    background: #1E293B;
+    margin: 0 14px;
+}
+
+.fin-step-line.active {
+    background: linear-gradient(90deg, #4F46E5 0%, #10B981 100%);
+}
+
+/* --- Slim Dark Dropzone --- */
+[data-testid="stFileUploader"] {
+    background-color: transparent !important;
+    padding: 0 !important;
+    margin-bottom: 12px !important;
+}
+
+[data-testid="stFileUploaderDropzone"] {
+    background-color: #121A2F !important;
+    border: 1.5px dashed rgba(99, 102, 241, 0.45) !important;
+    border-radius: 12px !important;
+    padding: 18px 24px !important;
+    transition: all 0.2s ease !important;
+}
+
+[data-testid="stFileUploaderDropzone"]:hover {
+    border-color: #6366F1 !important;
+    background-color: rgba(99, 102, 241, 0.06) !important;
+}
+
+[data-testid="stFileUploaderDropzone"] button {
+    background-color: #1E293B !important;
+    color: #F8FAFC !important;
+    border: 1px solid rgba(255, 255, 255, 0.12) !important;
+    border-radius: 8px !important;
+    font-weight: 600 !important;
+}
+
+[data-testid="stAlert"] {
+    background-color: #121A2F !important;
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    border-radius: 10px !important;
+    color: #F8FAFC !important;
+}
+
+/* --- Per-Field Confidence Chips --- */
+.conf-chip {
+    display: inline-flex;
+    align-items: center;
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 6px;
+    margin-left: 6px;
+}
+
+.conf-chip-high {
+    background: rgba(16, 185, 129, 0.12);
+    color: #34D399;
+    border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.conf-chip-med {
+    background: rgba(59, 130, 246, 0.12);
+    color: #60A5FA;
+    border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+.conf-chip-low {
+    background: rgba(245, 158, 11, 0.12);
+    color: #FBBF24;
+    border: 1.5px solid #F59E0B;
+    box-shadow: 0 0 6px rgba(245, 158, 11, 0.3);
+}
+
+/* --- Live Math Validation Banner --- */
+.math-bar-pass {
+    background: rgba(16, 185, 129, 0.1);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+    border-left: 4px solid #10B981;
+    border-radius: 8px;
+    padding: 10px 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin: 10px 0;
+    color: #34D399;
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+.math-bar-fail {
+    background: rgba(239, 68, 68, 0.1);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    border-left: 4px solid #EF4444;
+    border-radius: 8px;
+    padding: 10px 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin: 10px 0;
+    color: #F87171;
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+/* --- Live Risk Preview Card --- */
+.risk-preview-card {
+    background: #121A2F;
+    border: 1px solid var(--border-subtle);
+    border-radius: 12px;
+    padding: 16px;
+    margin-top: 14px;
+}
+
+/* --- Sticky Bottom Action Bar --- */
+.fin-sticky-bar {
+    position: sticky;
+    bottom: 0;
+    background: rgba(18, 26, 47, 0.95);
+    backdrop-filter: blur(10px);
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px 12px 0 0;
+    padding: 12px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    z-index: 99;
+    margin-top: 20px;
+}
     color: #FFFFFF !important;
     display: flex;
     align-items: center;

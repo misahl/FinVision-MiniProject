@@ -22,7 +22,7 @@ htmlcov/
 
 # FinVision uploads and local models
 uploads/
-models/*.joblib
+!models/model_v1.joblib
 !models/.gitkeep
 
 # Raw image dataset (2.3GB - kept local, documented via manifest.csv)

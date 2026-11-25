@@ -181,60 +181,77 @@ def render_app():
             st.warning("Your session has expired. Please log in again.")
             st.rerun()
 
-    # Render modern top navigation ribbon
-    components.render_topbar(user)
-
-    # Navigation structure
-    nav_mapping = {
-        "📊 Overview": "Overview",
-        "📤 Ingest & Verify": "Upload & Analyze",
-        "🔍 Review Console": "Verification Results",
-        "📁 Audit History": "Document History",
-        "⚡ Duplicate Shield": "Duplicate Detection",
-        "📈 Risk Analytics": "Risk Analytics",
-        "📄 Reports": "Reports",
-        "⚙️ Settings": "Settings",
-    }
-
-    if user.get("role") == "admin":
-        nav_mapping["🛡️ Administration"] = "Administration"
-
-    options_keys = list(nav_mapping.keys())
-    current_page = st.session_state.get("nav_page", "Overview")
-    matching_key = next((k for k, v in nav_mapping.items() if v == current_page), options_keys[0])
-
-    selected_key = st.segmented_control(
-        "Navigation Bar",
-        options=options_keys,
-        default=matching_key,
-        label_visibility="collapsed",
-    )
-    if selected_key and selected_key in nav_mapping:
-        selected_page = nav_mapping[selected_key]
-        st.session_state["nav_page"] = selected_page
-    else:
-        selected_page = current_page
-
-    # Sidebar: System telemetry & Quick sync
+    # Sidebar: Grouped Navigation, User Card & Single Status Indicator
     with st.sidebar:
         st.markdown(
             """
-            <div style="padding: 6px 0 12px 0;">
-                <h3 style="margin: 0; color: #FFFFFF; font-size: 1.15rem;">⚡ Telemetry</h3>
-                <span style="color: #60A5FA; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.08em;">CLOUD RUN US-CENTRAL1</span>
+            <div style="padding: 10px 0 16px 0;">
+                <div style="font-weight: 800; color: #FFFFFF; font-size: 1.25rem; display: flex; align-items: center; gap: 8px;">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#6366F1" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                    <span>FinVision</span>
+                    <span style="font-size: 0.68rem; font-weight: 700; color: #818CF8; background: rgba(99,102,241,0.15); padding: 2px 6px; border-radius: 4px; border: 1px solid rgba(99,102,241,0.3);">2.0</span>
+                </div>
             </div>
             """,
             unsafe_allow_html=True,
         )
 
+        current_page = st.session_state.get("nav_page", "Overview")
+
+        # 1. Workflow Group
+        st.markdown("<div style='font-size: 0.7rem; font-weight: 700; color: #64748B; text-transform: uppercase; letter-spacing: 0.08em; margin: 10px 0 6px 4px;'>Workflow</div>", unsafe_allow_html=True)
+        workflow_pages = [
+            ("Overview", "Overview"),
+            ("Ingest & Verify", "Upload & Analyze"),
+            ("Review Console", "Verification Results"),
+            ("Duplicate Shield", "Duplicate Detection"),
+        ]
+        for label, page_key in workflow_pages:
+            is_active = current_page == page_key
+            btn_type = "primary" if is_active else "secondary"
+            if st.button(label, key=f"nav_{page_key}", use_container_width=True, type=btn_type):
+                st.session_state["nav_page"] = page_key
+                st.rerun()
+
+        # 2. Insights Group
+        st.markdown("<div style='font-size: 0.7rem; font-weight: 700; color: #64748B; text-transform: uppercase; letter-spacing: 0.08em; margin: 16px 0 6px 4px;'>Insights</div>", unsafe_allow_html=True)
+        insight_pages = [
+            ("Risk Analytics", "Risk Analytics"),
+            ("Audit History", "Document History"),
+            ("Reports", "Reports"),
+        ]
+        for label, page_key in insight_pages:
+            is_active = current_page == page_key
+            btn_type = "primary" if is_active else "secondary"
+            if st.button(label, key=f"nav_{page_key}", use_container_width=True, type=btn_type):
+                st.session_state["nav_page"] = page_key
+                st.rerun()
+
+        # 3. System Group
+        st.markdown("<div style='font-size: 0.7rem; font-weight: 700; color: #64748B; text-transform: uppercase; letter-spacing: 0.08em; margin: 16px 0 6px 4px;'>System</div>", unsafe_allow_html=True)
+        system_pages = [("Settings", "Settings")]
+        if user.get("role") == "admin":
+            system_pages.append(("Administration", "Administration"))
+        for label, page_key in system_pages:
+            is_active = current_page == page_key
+            btn_type = "primary" if is_active else "secondary"
+            if st.button(label, key=f"nav_{page_key}", use_container_width=True, type=btn_type):
+                st.session_state["nav_page"] = page_key
+                st.rerun()
+
+        # Bottom section: User card, single status indicator, logout
+        st.markdown("<div style='margin-top: 32px;'></div>", unsafe_allow_html=True)
         st.markdown(
             f"""
-            <div style="background: #111827; border-radius: 8px; padding: 12px; margin-bottom: 14px; border: 1px solid rgba(255,255,255,0.08);">
-                <div style="font-size: 0.75rem; color: #94A3B8;">ACTIVE ACCOUNT</div>
-                <div style="font-weight: 700; color: #F8FAFC; font-size: 0.86rem;">{user.get('displayName', 'Analyst')}</div>
-                <div style="color: #64748B; font-size: 0.75rem; word-break: break-all;">{user.get('email', '')}</div>
-                <div style="margin-top: 8px;">
-                    <span class="badge-low" style="font-size: 0.7rem; padding: 2px 8px;">{user.get('role', 'analyst').upper()}</span>
+            <div style="background: #121A2F; border-radius: 10px; padding: 12px; margin-bottom: 12px; border: 1px solid rgba(255,255,255,0.08);">
+                <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 6px;">
+                    <span style="width: 7px; height: 7px; background-color: #10B981; border-radius: 50%; box-shadow: 0 0 6px #10B981; display: inline-block;"></span>
+                    <span style="font-size: 0.72rem; font-weight: 600; color: #34D399;">Operational</span>
+                </div>
+                <div style="font-weight: 700; color: #F8FAFC; font-size: 0.85rem;">{user.get('displayName', 'Analyst')}</div>
+                <div style="color: #64748B; font-size: 0.74rem; word-break: break-all;">{user.get('email', '')}</div>
+                <div style="margin-top: 6px;">
+                    <span class="badge-low" style="font-size: 0.68rem; padding: 1px 7px;">{user.get('role', 'analyst').upper()}</span>
                 </div>
             </div>
             """,
@@ -243,21 +260,32 @@ def render_app():
 
         col_sb1, col_sb2 = st.columns(2)
         with col_sb1:
-            if st.button("🔄 Sync", use_container_width=True, help="Invalidate cache and fetch real-time fresh records"):
+            if st.button("Sync Data", use_container_width=True):
                 firebase_service.invalidate_cache()
-                st.toast("Portfolio data synchronized with Firestore", icon="⚡")
+                st.toast("Portfolio data refreshed", icon="⚡")
                 st.rerun()
 
         with col_sb2:
-            if st.button("🚪 Logout", use_container_width=True):
+            if st.button("Logout", use_container_width=True):
                 st.session_state["user"] = None
                 st.session_state["id_token"] = None
                 st.session_state["selected_doc_id"] = None
                 st.rerun()
 
-        st.markdown(
-            """
-            <div style="margin-top: 20px; font-size: 0.72rem; color: #64748B; line-height: 1.4;">
+    # Top Bar with page title, breadcrumb, global search, notifications, profile
+    page_title_map = {
+        "Overview": "Overview",
+        "Upload & Analyze": "Ingest & Verify",
+        "Verification Results": "Review Console",
+        "Document History": "Audit History",
+        "Duplicate Detection": "Duplicate Shield",
+        "Risk Analytics": "Risk Analytics",
+        "Reports": "Reports",
+        "Settings": "Settings",
+        "Administration": "Administration",
+    }
+    display_title = page_title_map.get(current_page, current_page)
+    components.render_topbar(user, active_section=display_title)
                 <div>Engine: <b>FinVision v2.1</b></div>
                 <div>OCR: <b>PyMuPDF + Tesseract</b></div>
                 <div>Storage: <b>GCS Verified</b></div>
