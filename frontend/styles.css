@@ -732,3 +732,319 @@ div[data-testid="stDataFrame"] *,
 div[data-testid="stDataEditor"] * {
     color: #1D1D1F !important;
 }
+
+/* ===============================================================
+   FINVISION 2.0 — RESPONSIVE DESIGN SYSTEM & MOBILE ADAPTATIONS
+   Breakpoints:
+     - Under 640px: Mobile layout (optimized for 390x844 viewport)
+     - 640px to 1024px: Tablet layout (2-column grid, collapsed sidebar)
+     - Above 1024px: Desktop layout (UNCHANGED)
+   =============================================================== */
+
+/* ---------------------------------------------------------------
+   TABLET & COMPACT SCREENS (640px to 1024px)
+   --------------------------------------------------------------- */
+@media (max-width: 1024px) {
+    /* 2-Column Grid for Horizontal Blocks */
+    div[data-testid="stHorizontalBlock"] {
+        flex-wrap: wrap !important;
+        gap: 12px !important;
+    }
+
+    div[data-testid="stHorizontalBlock"] > div[data-testid="column"] {
+        flex: 1 1 calc(50% - 12px) !important;
+        min-width: calc(50% - 12px) !important;
+    }
+
+    /* Keep KPI metric cards neat on tablet */
+    .fin-card-value {
+        font-size: 1.45rem !important;
+    }
+
+    /* Topbar search compact */
+    .fin-topbar-search {
+        width: 180px !important;
+    }
+}
+
+/* ---------------------------------------------------------------
+   MOBILE SMARTPHONES (Under 640px — Designed for 390x844)
+   --------------------------------------------------------------- */
+@media (max-width: 640px) {
+    /* 1. Viewport & Safe-Area Bounds */
+    html, body, .stApp {
+        overflow-x: hidden !important;
+        max-width: 100vw !important;
+    }
+
+    .main .block-container {
+        padding-left: 16px !important;
+        padding-right: 16px !important;
+        padding-top: max(14px, env(safe-area-inset-top)) !important;
+        padding-bottom: max(24px, env(safe-area-inset-bottom)) !important;
+        max-width: 100vw !important;
+        box-sizing: border-box !important;
+    }
+
+    /* 2. Slide-In Hamburger Sidebar from Left */
+    section[data-testid="stSidebar"] {
+        width: 86vw !important;
+        max-width: 320px !important;
+        background: rgba(242, 242, 247, 0.98) !important;
+        backdrop-filter: blur(25px) !important;
+        -webkit-backdrop-filter: blur(25px) !important;
+        box-shadow: 6px 0 28px rgba(0, 0, 0, 0.18) !important;
+        z-index: 999999 !important;
+        padding-top: max(16px, env(safe-area-inset-top)) !important;
+        padding-bottom: max(20px, env(safe-area-inset-bottom)) !important;
+    }
+
+    section[data-testid="stSidebar"] div[role="radiogroup"] label {
+        min-height: 44px !important;
+        padding: 10px 14px !important;
+        margin-bottom: 6px !important;
+    }
+
+    section[data-testid="stSidebar"] button {
+        min-height: 44px !important;
+    }
+
+    /* 3. Mobile Top Bar */
+    .fin-topbar {
+        padding: 8px 12px !important;
+        margin-bottom: 14px !important;
+        gap: 8px !important;
+    }
+
+    .fin-breadcrumb-cat,
+    .fin-breadcrumb-sep {
+        display: none !important;
+    }
+
+    .fin-breadcrumb-active {
+        font-size: 0.88rem !important;
+        white-space: nowrap !important;
+    }
+
+    .fin-topbar-right {
+        gap: 10px !important;
+    }
+
+    /* Search shrinks to a single tap icon */
+    .fin-search-text,
+    .fin-search-shortcut {
+        display: none !important;
+    }
+
+    .fin-topbar-search {
+        width: 38px !important;
+        height: 38px !important;
+        min-width: 38px !important;
+        min-height: 38px !important;
+        padding: 0 !important;
+        border-radius: 50% !important;
+        justify-content: center !important;
+    }
+
+    .fin-notification-bell {
+        width: 38px !important;
+        height: 38px !important;
+        min-width: 38px !important;
+        min-height: 38px !important;
+    }
+
+    /* Show only Avatar; hide user name and role text on mobile */
+    .fin-user-meta {
+        display: none !important;
+    }
+
+    .fin-user-profile-widget {
+        padding-left: 6px !important;
+        border-left: none !important;
+    }
+
+    .fin-user-avatar {
+        width: 34px !important;
+        height: 34px !important;
+        min-width: 34px !important;
+        min-height: 34px !important;
+    }
+
+    /* 4. Page Titles & Subtitles */
+    .main h1, section.main h1 {
+        font-size: 1.4rem !important;
+        line-height: 1.25 !important;
+        letter-spacing: -0.02em !important;
+        word-break: break-word !important;
+    }
+
+    .main h2, section.main h2 {
+        font-size: 1.2rem !important;
+        line-height: 1.3 !important;
+        word-break: break-word !important;
+    }
+
+    .main h3, section.main h3 {
+        font-size: 1.05rem !important;
+    }
+
+    .main p, .stCaption {
+        font-size: 0.82rem !important;
+        line-height: 1.4 !important;
+    }
+
+    /* 5. Mobile Stepper */
+    .fin-stepper {
+        padding: 6px 10px !important;
+        margin-bottom: 14px !important;
+        overflow-x: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+        gap: 4px !important;
+    }
+
+    .fin-step {
+        gap: 5px !important;
+    }
+
+    .fin-step-circle {
+        width: 22px !important;
+        height: 22px !important;
+        font-size: 0.68rem !important;
+    }
+
+    .fin-step-label {
+        font-size: 0.72rem !important;
+        white-space: nowrap !important;
+    }
+
+    .fin-step-line {
+        margin: 0 4px !important;
+        min-width: 10px !important;
+    }
+
+    /* 6. Columns & Grids (2 per row for Quick Actions & KPI Cards) */
+    div[data-testid="stHorizontalBlock"] {
+        flex-wrap: wrap !important;
+        gap: 12px !important;
+    }
+
+    div[data-testid="stHorizontalBlock"] > div[data-testid="column"] {
+        flex: 1 1 calc(50% - 6px) !important;
+        min-width: calc(50% - 6px) !important;
+        max-width: 100% !important;
+    }
+
+    /* 7. KPI Metric Cards (2 per row, equal height, numbers never wrap) */
+    .fin-card {
+        padding: 12px 14px !important;
+        min-height: 98px !important;
+        border-radius: var(--radius-inner) !important;
+        display: flex !important;
+        flex-direction: column !important;
+        justify-content: center !important;
+    }
+
+    .fin-card-title {
+        font-size: 0.68rem !important;
+        letter-spacing: 0.04em !important;
+        margin-bottom: 4px !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+    }
+
+    .fin-card-value {
+        font-size: 1.25rem !important;
+        line-height: 1.15 !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+    }
+
+    .fin-card-subtitle {
+        font-size: 0.7rem !important;
+        margin-top: 4px !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+    }
+
+    /* 8. Charts: Stack 1 per row, full width, height ~240px */
+    div[data-testid="stHorizontalBlock"]:has(.js-plotly-plot) > div[data-testid="column"],
+    div[data-testid="column"]:has(.js-plotly-plot),
+    div[data-testid="column"]:has(div.stPlotlyChart) {
+        flex: 1 1 100% !important;
+        min-width: 100% !important;
+    }
+
+    .js-plotly-plot,
+    div.stPlotlyChart {
+        height: 240px !important;
+        max-height: 240px !important;
+        width: 100% !important;
+    }
+
+    /* 9. Ingest & Verify Split View (Preview then Fields Stacked in 1 Column) */
+    div[data-testid="stHorizontalBlock"]:has([data-testid="stImage"]) > div[data-testid="column"] {
+        flex: 1 1 100% !important;
+        min-width: 100% !important;
+    }
+
+    /* Stack extracted form fields in single column */
+    div[data-testid="stHorizontalBlock"]:has(input[aria-label="inv_num"]) > div[data-testid="column"],
+    div[data-testid="stHorizontalBlock"]:has(input[aria-label="subtotal"]) > div[data-testid="column"] {
+        flex: 1 1 100% !important;
+        min-width: 100% !important;
+    }
+
+    /* 10. Forms, Inputs & Tap Targets (44px min height, 16px font to prevent iOS zoom) */
+    input, select, textarea,
+    div[data-baseweb="input"] input,
+    div[data-baseweb="select"] {
+        font-size: 16px !important;
+        min-height: 44px !important;
+        border-radius: var(--radius-inner) !important;
+    }
+
+    .stButton > button {
+        min-height: 44px !important;
+        min-width: 44px !important;
+        font-size: 0.92rem !important;
+        padding: 10px 14px !important;
+    }
+
+    /* Primary CTA buttons full width on mobile */
+    .stButton > button[kind="primary"] {
+        width: 100% !important;
+    }
+
+    /* 11. Tables, DataFrames & Data Editors (Horizontal Scrollable Container) */
+    div[data-testid="stDataFrame"],
+    div[data-testid="stDataEditor"],
+    div[data-testid="stTable"] {
+        width: 100% !important;
+        overflow-x: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+        border-radius: var(--radius-inner) !important;
+    }
+
+    /* 12. Batch Hub & Action Stacking */
+    .batch-hub-card {
+        padding: 16px !important;
+    }
+
+    .batch-row-item {
+        flex-direction: column !important;
+        align-items: flex-start !important;
+        gap: 8px !important;
+        padding: 12px 14px !important;
+    }
+
+    .batch-row-item > div:last-child {
+        width: 100% !important;
+    }
+
+    .batch-row-item button {
+        width: 100% !important;
+    }
+}

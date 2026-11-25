@@ -62,6 +62,7 @@ def run_pipeline_on_bytes(
     existing_docs: List[Dict[str, Any]],
     edited_fields: Dict[str, Any] = None,
     edited_line_items: List[Dict[str, Any]] = None,
+    folder: str = "Operations",
 ) -> Dict[str, Any]:
     """Execute end-to-end FinVision pipeline on raw invoice file bytes with optional analyst field overrides."""
     mime_type = image_processing.detect_mime_type(file_bytes)
@@ -131,6 +132,7 @@ def run_pipeline_on_bytes(
 
     file_meta = {
         "filename": filename,
+        "folder": folder,
         "storagePath": storage_path,
         "mimeType": mime_type,
         "fileSizeBytes": len(file_bytes),
@@ -524,16 +526,56 @@ def render_upload(user: Dict[str, Any]):
                 st.session_state.pop("batch_chunk_files", None)
 
     with tab_camera_scan:
+        import streamlit.components.v1 as st_components
+        st_components.html(
+            """
+            <script>
+            (function() {
+                function enforceRearCamera(targetNav) {
+                    if (!targetNav || !targetNav.mediaDevices || !targetNav.mediaDevices.getUserMedia) return;
+                    if (targetNav.__finvision_camera_patched) return;
+                    targetNav.__finvision_camera_patched = true;
+                    const origGetUserMedia = targetNav.mediaDevices.getUserMedia.bind(targetNav.mediaDevices);
+                    targetNav.mediaDevices.getUserMedia = function(constraints) {
+                        try {
+                            if (constraints) {
+                                if (!constraints.video) {
+                                    constraints.video = { facingMode: { ideal: "environment" } };
+                                } else if (typeof constraints.video === 'object') {
+                                    constraints.video.facingMode = { ideal: "environment" };
+                                } else {
+                                    constraints.video = { facingMode: { ideal: "environment" } };
+                                }
+                            }
+                        } catch(e) {}
+                        return origGetUserMedia(constraints);
+                    };
+                }
+                try { enforceRearCamera(window.navigator); } catch(e) {}
+                try { if (window.parent) enforceRearCamera(window.parent.navigator); } catch(e) {}
+                try { if (window.top) enforceRearCamera(window.top.navigator); } catch(e) {}
+            })();
+            </script>
+            """,
+            height=0,
+            width=0,
+        )
         st.markdown(
             """
-            <div style="margin: 8px 0 12px 0;">
-                <div style="font-weight: 600; font-size: 0.95rem; color: #1D1D1F;">Real-Time Camera Document Scanner</div>
-                <div style="font-size: 0.82rem; color: #515154;">Position physical paper invoices, receipts, or handheld documentation directly in front of your camera. Take a photo to start AI verification immediately.</div>
+            <div style="margin: 8px 0 14px 0; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+                <div>
+                    <div style="font-weight: 700; font-size: 0.95rem; color: #1D1D1F;">Real-Time Camera Document Scanner</div>
+                    <div style="font-size: 0.82rem; color: #515154;">Position physical paper invoices or receipts flat in front of your camera.</div>
+                </div>
+                <div style="background: rgba(36, 138, 61, 0.12); color: #166534; font-size: 0.74rem; font-weight: 700; padding: 4px 12px; border-radius: 980px; border: 1px solid rgba(36, 138, 61, 0.3); display: flex; align-items: center; gap: 6px;">
+                    <span style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #248A3D;"></span>
+                    <span>Rear Camera Active (Environment Mode)</span>
+                </div>
             </div>
             """,
             unsafe_allow_html=True,
         )
-        camera_photo = st.camera_input("Capture invoice with your device camera", label_visibility="collapsed")
+        camera_photo = st.camera_input("Capture invoice with back camera", label_visibility="collapsed")
         if camera_photo:
             photo_bytes = camera_photo.getvalue()
             photo_name = f"scan_{datetime.now().strftime('%Y%m%d_%H%M%S')}.jpg"
@@ -545,7 +587,7 @@ def render_upload(user: Dict[str, Any]):
             }
             st.session_state.pop("active_sample_file", None)
             st.session_state.pop("batch_chunk_files", None)
-            st.success(f"✓ Captured scan: `{photo_name}` ready for verification.")
+            st.success(f"✓ Captured rear camera scan: `{photo_name}` ready for verification.")
 
     # Check for Batch Mode vs Single Inspection Mode
     batch_files = st.session_state.get("batch_chunk_files")

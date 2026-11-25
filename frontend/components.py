@@ -20,28 +20,28 @@ def render_topbar(user: Dict[str, Any], active_section: str = "Ingest & Verify")
     st.markdown(
         f"""
         <div class="fin-topbar">
-            <div style="display: flex; align-items: center; gap: 14px;">
-                <div style="display: flex; align-items: center; gap: 6px; font-size: 0.84rem; color: #6E6E73;">
-                    <span style="font-weight: 600; color: #6E6E73;">{category}</span>
-                    <span>/</span>
-                    <span style="font-weight: 700; color: #1D1D1F;">{active_section}</span>
+            <div class="fin-topbar-left" style="display: flex; align-items: center; gap: 14px;">
+                <div class="fin-topbar-breadcrumb" style="display: flex; align-items: center; gap: 6px; font-size: 0.84rem; color: #6E6E73;">
+                    <span class="fin-breadcrumb-cat" style="font-weight: 600; color: #6E6E73;">{category}</span>
+                    <span class="fin-breadcrumb-sep">/</span>
+                    <span class="fin-breadcrumb-active" style="font-weight: 700; color: #1D1D1F;">{active_section}</span>
                 </div>
             </div>
-            <div style="display: flex; align-items: center; gap: 16px;">
+            <div class="fin-topbar-right" style="display: flex; align-items: center; gap: 16px;">
                 <div class="fin-topbar-search">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6E6E73" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-                    <span style="color: #6E6E73; font-size: 0.8rem; margin-left: 6px;">Search portfolio invoices, vendors...</span>
-                    <span style="background: rgba(0,0,0,0.06); font-size: 0.68rem; padding: 1px 6px; border-radius: 4px; color: #6E6E73; margin-left: 12px; font-weight: 600;">⌘K</span>
+                    <span class="fin-search-text" style="color: #6E6E73; font-size: 0.8rem; margin-left: 6px;">Search portfolio invoices, vendors...</span>
+                    <span class="fin-search-shortcut" style="background: rgba(0,0,0,0.06); font-size: 0.68rem; padding: 1px 6px; border-radius: 4px; color: #6E6E73; margin-left: 12px; font-weight: 600;">⌘K</span>
                 </div>
                 <div class="fin-notification-bell" title="System alerts">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#1D1D1F" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
                     <span class="fin-bell-badge">3</span>
                 </div>
-                <div style="display: flex; align-items: center; gap: 10px; border-left: 1px solid rgba(0,0,0,0.08); padding-left: 16px;">
-                    <div style="width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, #0071E3 0%, #0284C7 100%); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.85rem; color: #FFFFFF;">
+                <div class="fin-user-profile-widget" style="display: flex; align-items: center; gap: 10px; border-left: 1px solid rgba(0,0,0,0.08); padding-left: 16px;">
+                    <div class="fin-user-avatar" style="width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, #0071E3 0%, #0284C7 100%); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.85rem; color: #FFFFFF;">
                         {user_name[:1].upper()}
                     </div>
-                    <div style="line-height: 1.15;">
+                    <div class="fin-user-meta" style="line-height: 1.15;">
                         <span style="font-weight: 700; font-size: 0.84rem; color: #1D1D1F; display: block;">{user_name}</span>
                         <span style="font-size: 0.7rem; font-weight: 700; color: {role_color};">{role}</span>
                     </div>

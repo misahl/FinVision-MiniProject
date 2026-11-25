@@ -55,7 +55,7 @@ def render_verify(user: dict):
 
     # 1. Top Executive Status Bar
     st.markdown("<div style='margin-top: 8px; margin-bottom: 16px;'>", unsafe_allow_html=True)
-    b1, b2, b3, b4 = st.columns(4)
+    b1, b2, b3, b4, b5 = st.columns(5)
     with b1:
         st.markdown(
             f"""
@@ -98,7 +98,107 @@ def render_verify(user: dict):
             """,
             unsafe_allow_html=True,
         )
+    with b5:
+        folder_name = doc.get("folder", "Operations")
+        st.markdown(
+            f"""
+            <div class="fin-card" style="padding: 14px 18px; margin-bottom: 0;">
+                <div class="fin-card-title">Assigned Folder</div>
+                <div style="font-weight: 700; font-size: 0.95rem; color: #0071E3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">📂 {folder_name}</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
     st.markdown("</div>", unsafe_allow_html=True)
+
+    # Document Quick Action Bar: Edit & Delete
+    act_col1, act_col2, act_col_space = st.columns([1, 1, 3])
+    with act_col1:
+        if st.button("✏️ Edit Fields / Folder", use_container_width=True, key="vc_btn_edit"):
+            st.session_state[f"vc_edit_{chosen_id}"] = not st.session_state.get(f"vc_edit_{chosen_id}", False)
+            st.session_state[f"vc_del_{chosen_id}"] = False
+    with act_col2:
+        if st.button("🗑️ Delete Invoice", use_container_width=True, key="vc_btn_del"):
+            st.session_state[f"vc_del_{chosen_id}"] = not st.session_state.get(f"vc_del_{chosen_id}", False)
+            st.session_state[f"vc_edit_{chosen_id}"] = False
+
+    if st.session_state.get(f"vc_edit_{chosen_id}"):
+        with st.container():
+            st.markdown(
+                """
+                <div style="background: #FFFFFF; border: 1.5px solid #0071E3; border-radius: 16px; padding: 18px; margin-bottom: 14px; box-shadow: 0 4px 20px rgba(0, 113, 227, 0.08);">
+                    <div style="font-weight: 700; font-size: 1rem; color: #1D1D1F;">✏️ Edit Invoice Document</div>
+                    <div style="font-size: 0.8rem; color: #515154;">Modify invoice details and folder categorization.</div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+            known_folders = ["Operations", "IT & Software", "Logistics", "Marketing", "Legal & Consulting", "Utilities"]
+            cur_fld = doc.get("folder", "Operations")
+            fld_opts = sorted(list(set(known_folders + [cur_fld])))
+            f_col1, f_col2 = st.columns(2)
+            with f_col1:
+                sel_fld_vc = st.selectbox("Assign Folder", options=fld_opts, index=fld_opts.index(cur_fld) if cur_fld in fld_opts else 0, key=f"vc_fld_{chosen_id}")
+            with f_col2:
+                new_fld_vc = st.text_input("Or Custom Folder Name", placeholder="Leave blank to use selected folder", key=f"vc_custom_fld_{chosen_id}")
+
+            e1, e2, e3 = st.columns(3)
+            with e1:
+                v_inv = st.text_input("Invoice #", value=fields.get("invoiceNumber") or "", key=f"vc_e_inv_{chosen_id}")
+                v_vend = st.text_input("Vendor", value=fields.get("vendor") or "", key=f"vc_e_vend_{chosen_id}")
+            with e2:
+                v_dt = st.text_input("Date", value=fields.get("date") or "", key=f"vc_e_dt_{chosen_id}")
+                v_due = st.text_input("Due Date", value=fields.get("dueDate") or "", key=f"vc_e_due_{chosen_id}")
+            with e3:
+                v_sub = st.number_input("Subtotal ($)", value=float(fields.get("subtotal") or 0.0), step=10.0, format="%.2f", key=f"vc_e_sub_{chosen_id}")
+                v_tot = st.number_input("Total ($)", value=float(fields.get("total") or 0.0), step=10.0, format="%.2f", key=f"vc_e_tot_{chosen_id}")
+
+            sv1, sv2 = st.columns([1, 4])
+            with sv1:
+                if st.button("💾 Save Changes", type="primary", use_container_width=True, key=f"vc_save_{chosen_id}"):
+                    final_fld = new_fld_vc.strip() if new_fld_vc.strip() else sel_fld_vc
+                    up_f = dict(fields)
+                    up_f["invoiceNumber"] = v_inv.strip()
+                    up_f["vendor"] = v_vend.strip()
+                    up_f["date"] = v_dt.strip()
+                    up_f["dueDate"] = v_due.strip()
+                    up_f["subtotal"] = v_sub
+                    up_f["total"] = v_tot
+                    firebase_service.update_document_fields(chosen_id, up_f, folder=final_fld, user=user)
+                    st.session_state[f"vc_edit_{chosen_id}"] = False
+                    st.toast(f"Invoice updated in folder '{final_fld}'!", icon="✅")
+                    st.rerun()
+            with sv2:
+                if st.button("Cancel", key=f"vc_cancel_{chosen_id}"):
+                    st.session_state[f"vc_edit_{chosen_id}"] = False
+                    st.rerun()
+
+    if st.session_state.get(f"vc_del_{chosen_id}"):
+        with st.container():
+            st.markdown(
+                f"""
+                <div style="background: #FEF2F2; border: 1.5px solid #DC2626; border-radius: 16px; padding: 18px; margin-bottom: 14px;">
+                    <div style="font-weight: 700; font-size: 1rem; color: #991B1B;">🗑️ Confirm Invoice Deletion</div>
+                    <div style="font-size: 0.84rem; color: #7F1D1D; margin-top: 4px;">
+                        Permanently delete <b>{fields.get('invoiceNumber') or chosen_id}</b>? This will purge all verification metrics and audit history.
+                    </div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+            del_c1, del_c2 = st.columns([1.5, 4])
+            with del_c1:
+                if st.button("🗑️ Yes, Delete", type="primary", use_container_width=True, key=f"vc_confirm_del_{chosen_id}"):
+                    firebase_service.delete_document(chosen_id, user=user)
+                    st.session_state[f"vc_del_{chosen_id}"] = False
+                    st.session_state.pop("selected_doc_id", None)
+                    st.toast(f"Invoice {chosen_id} deleted.", icon="🗑️")
+                    st.session_state["nav_page"] = "Document History"
+                    st.rerun()
+            with del_c2:
+                if st.button("Cancel", key=f"vc_cancel_del_{chosen_id}"):
+                    st.session_state[f"vc_del_{chosen_id}"] = False
+                    st.rerun()
 
     # 2. Main Two-Column Layout (Scan Preview vs Verification Details)
     col_scan, col_details = st.columns([1, 1.25])
