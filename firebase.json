@@ -27,6 +27,13 @@
         ]
       }
     ],
+    "redirects": [
+      {
+        "source": "**",
+        "destination": "https://finvision-824423948268.us-central1.run.app",
+        "type": 302
+      }
+    ],
     "rewrites": [
       {
         "source": "**",
