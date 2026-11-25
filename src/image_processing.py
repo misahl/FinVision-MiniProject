@@ -26,11 +26,15 @@ import pymupdf  # Modern PyMuPDF import
 # 1. Image Loading, Conversion & Sniffing
 # -------------------------------------------------------------------------
 
-def detect_mime_type(data: bytes) -> str:
+def detect_mime_type(data: Union[bytes, str]) -> str:
     """Sniff magic bytes to identify file format reliably.
     
     Do not trust file extensions alone.
     """
+    if isinstance(data, str):
+        data = data.encode("latin-1", errors="ignore")
+    if not isinstance(data, (bytes, bytearray)):
+        return "application/octet-stream"
     if data.startswith(b"\xff\xd8\xff"):
         return "image/jpeg"
     elif data.startswith(b"\x89PNG\r\n\x1a\n"):
@@ -39,7 +43,7 @@ def detect_mime_type(data: bytes) -> str:
         return "application/pdf"
     elif data.startswith(b"GIF87a") or data.startswith(b"GIF89a"):
         return "image/gif"
-    elif data.startswith(b"RIFF") and data[8:12] == b"WEBP":
+    elif data.startswith(b"RIFF") and len(data) >= 12 and data[8:12] == b"WEBP":
         return "image/webp"
     return "application/octet-stream"
 
