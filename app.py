@@ -8,6 +8,7 @@ import streamlit as st
 
 from src import firebase_service
 from frontend import (
+    components,
     dashboard,
     upload,
     verify,
@@ -162,25 +163,65 @@ def render_auth_screen():
 # Authenticated Navigation & Routing
 # -------------------------------------------------------------------------
 
+import time
+
 def render_app():
     user = st.session_state["user"]
 
-    # Verify ID token validity on every request
-    try:
-        firebase_service.verify_user_token(st.session_state["id_token"])
-    except Exception:
-        st.session_state["user"] = None
-        st.session_state["id_token"] = None
-        st.warning("Your session has expired. Please log in again.")
-        st.rerun()
+    # Verify ID token validity periodically (every 10 minutes) rather than on every widget interaction
+    last_auth = st.session_state.get("last_auth_check", 0.0)
+    now = time.time()
+    if now - last_auth > 600.0:
+        try:
+            firebase_service.verify_user_token(st.session_state["id_token"])
+            st.session_state["last_auth_check"] = now
+        except Exception:
+            st.session_state["user"] = None
+            st.session_state["id_token"] = None
+            st.warning("Your session has expired. Please log in again.")
+            st.rerun()
 
-    # Sidebar Navigation
+    # Render modern top navigation ribbon
+    components.render_topbar(user)
+
+    # Navigation structure
+    nav_mapping = {
+        "📊 Overview": "Overview",
+        "📤 Ingest & Verify": "Upload & Analyze",
+        "🔍 Review Console": "Verification Results",
+        "📁 Audit History": "Document History",
+        "⚡ Duplicate Shield": "Duplicate Detection",
+        "📈 Risk Analytics": "Risk Analytics",
+        "📄 Reports": "Reports",
+        "⚙️ Settings": "Settings",
+    }
+
+    if user.get("role") == "admin":
+        nav_mapping["🛡️ Administration"] = "Administration"
+
+    options_keys = list(nav_mapping.keys())
+    current_page = st.session_state.get("nav_page", "Overview")
+    matching_key = next((k for k, v in nav_mapping.items() if v == current_page), options_keys[0])
+
+    selected_key = st.segmented_control(
+        "Navigation Bar",
+        options=options_keys,
+        default=matching_key,
+        label_visibility="collapsed",
+    )
+    if selected_key and selected_key in nav_mapping:
+        selected_page = nav_mapping[selected_key]
+        st.session_state["nav_page"] = selected_page
+    else:
+        selected_page = current_page
+
+    # Sidebar: System telemetry & Quick sync
     with st.sidebar:
         st.markdown(
             """
-            <div style="padding: 10px 0 16px 0;">
-                <h2 style="margin: 0; color: #FFFFFF; font-size: 1.35rem;">🛡️ FinVision</h2>
-                <span style="color: #60A5FA; font-size: 0.78rem; font-weight: 600; letter-spacing: 0.08em;">VERIFICATION PLATFORM</span>
+            <div style="padding: 6px 0 12px 0;">
+                <h3 style="margin: 0; color: #FFFFFF; font-size: 1.15rem;">⚡ Telemetry</h3>
+                <span style="color: #60A5FA; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.08em;">CLOUD RUN US-CENTRAL1</span>
             </div>
             """,
             unsafe_allow_html=True,
@@ -188,49 +229,43 @@ def render_app():
 
         st.markdown(
             f"""
-            <div style="background-color: #1E293B; border-radius: 8px; padding: 12px; margin-bottom: 16px; border: 1px solid #334155;">
-                <div style="font-weight: 600; color: #F8FAFC; font-size: 0.88rem;">{user.get('displayName', 'Analyst')}</div>
-                <div style="color: #94A3B8; font-size: 0.75rem;">{user.get('email', '')}</div>
-                <div style="margin-top: 6px;"><span class="badge-low">{user.get('role', 'analyst').upper()}</span></div>
+            <div style="background: #111827; border-radius: 8px; padding: 12px; margin-bottom: 14px; border: 1px solid rgba(255,255,255,0.08);">
+                <div style="font-size: 0.75rem; color: #94A3B8;">ACTIVE ACCOUNT</div>
+                <div style="font-weight: 700; color: #F8FAFC; font-size: 0.86rem;">{user.get('displayName', 'Analyst')}</div>
+                <div style="color: #64748B; font-size: 0.75rem; word-break: break-all;">{user.get('email', '')}</div>
+                <div style="margin-top: 8px;">
+                    <span class="badge-low" style="font-size: 0.7rem; padding: 2px 8px;">{user.get('role', 'analyst').upper()}</span>
+                </div>
             </div>
             """,
             unsafe_allow_html=True,
         )
 
-        nav_options = [
-            "Overview",
-            "Upload & Analyze",
-            "Verification Results",
-            "Document History",
-            "Duplicate Detection",
-            "Risk Analytics",
-            "Reports",
-            "Settings",
-        ]
+        col_sb1, col_sb2 = st.columns(2)
+        with col_sb1:
+            if st.button("🔄 Sync", use_container_width=True, help="Invalidate cache and fetch real-time fresh records"):
+                firebase_service.invalidate_cache()
+                st.toast("Portfolio data synchronized with Firestore", icon="⚡")
+                st.rerun()
 
-        # Enforce RBAC: Administration only visible for administrators
-        if user.get("role") == "admin":
-            nav_options.append("Administration")
+        with col_sb2:
+            if st.button("🚪 Logout", use_container_width=True):
+                st.session_state["user"] = None
+                st.session_state["id_token"] = None
+                st.session_state["selected_doc_id"] = None
+                st.rerun()
 
-        # Sync nav selection
-        current_page = st.session_state.get("nav_page", "Overview")
-        if current_page not in nav_options:
-            current_page = "Overview"
-
-        selected_page = st.radio(
-            "Navigation Menu",
-            options=nav_options,
-            index=nav_options.index(current_page),
-            label_visibility="collapsed",
+        st.markdown(
+            """
+            <div style="margin-top: 20px; font-size: 0.72rem; color: #64748B; line-height: 1.4;">
+                <div>Engine: <b>FinVision v2.1</b></div>
+                <div>OCR: <b>PyMuPDF + Tesseract</b></div>
+                <div>Storage: <b>GCS Verified</b></div>
+                <div>Rules: <b>Deterministic Math</b></div>
+            </div>
+            """,
+            unsafe_allow_html=True,
         )
-        st.session_state["nav_page"] = selected_page
-
-        st.markdown("---")
-        if st.button("🚪 Sign Out", use_container_width=True):
-            st.session_state["user"] = None
-            st.session_state["id_token"] = None
-            st.session_state["selected_doc_id"] = None
-            st.rerun()
 
     # Page Router
     if selected_page == "Overview":

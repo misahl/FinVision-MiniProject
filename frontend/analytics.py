@@ -117,6 +117,7 @@ def render_analytics(user: Dict[str, Any]):
                 color_continuous_scale="Reds",
             )
             fig_rules.update_layout(
+                template="plotly_dark",
                 margin=dict(t=10, b=10, l=10, r=10),
                 height=300,
                 paper_bgcolor="rgba(0,0,0,0)",
@@ -149,6 +150,7 @@ def render_analytics(user: Dict[str, Any]):
                 hole=0.55,
             )
             fig_factors.update_layout(
+                template="plotly_dark",
                 margin=dict(t=10, b=10, l=10, r=10),
                 height=300,
                 paper_bgcolor="rgba(0,0,0,0)",
@@ -172,6 +174,7 @@ def render_analytics(user: Dict[str, Any]):
             color_discrete_sequence=["#2563EB"],
         )
         fig_hist.update_layout(
+            template="plotly_dark",
             margin=dict(t=10, b=10, l=10, r=10),
             height=280,
             paper_bgcolor="rgba(0,0,0,0)",
@@ -189,6 +192,7 @@ def render_analytics(user: Dict[str, Any]):
             color_discrete_sequence=["#10B981"],
         )
         fig_ocr.update_layout(
+            template="plotly_dark",
             margin=dict(t=10, b=10, l=10, r=10),
             height=280,
             paper_bgcolor="rgba(0,0,0,0)",

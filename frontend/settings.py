@@ -26,17 +26,17 @@ def render_settings(user: Dict[str, Any]):
             f"""
             <div class="fin-card">
                 <div style="display: grid; grid-template-columns: 160px 1fr; row-gap: 12px; font-size: 0.92rem;">
-                    <div style="font-weight: 600; color: #64748B;">Full Name:</div>
-                    <div style="font-weight: 700; color: #0F172A;">{user.get('displayName', 'Analyst')}</div>
+                    <div style="font-weight: 600; color: #94A3B8;">Full Name:</div>
+                    <div style="font-weight: 700; color: #F8FAFC;">{user.get('displayName', 'Analyst')}</div>
                     
-                    <div style="font-weight: 600; color: #64748B;">Work Email:</div>
-                    <div style="font-weight: 500; color: #0F172A;">{user.get('email', 'N/A')}</div>
+                    <div style="font-weight: 600; color: #94A3B8;">Work Email:</div>
+                    <div style="font-weight: 500; color: #F8FAFC;">{user.get('email', 'N/A')}</div>
                     
-                    <div style="font-weight: 600; color: #64748B;">System Role:</div>
+                    <div style="font-weight: 600; color: #94A3B8;">System Role:</div>
                     <div><span class="badge-low">{user.get('role', 'analyst').upper()}</span></div>
                     
-                    <div style="font-weight: 600; color: #64748B;">Account UID:</div>
-                    <div style="font-family: monospace; font-size: 0.85rem; color: #334155;">{user.get('uid', 'N/A')}</div>
+                    <div style="font-weight: 600; color: #94A3B8;">Account UID:</div>
+                    <div style="font-family: monospace; font-size: 0.85rem; color: #60A5FA;">{user.get('uid', 'N/A')}</div>
                 </div>
             </div>
             """,
@@ -50,17 +50,17 @@ def render_settings(user: Dict[str, Any]):
             f"""
             <div class="fin-card">
                 <div style="display: grid; grid-template-columns: 280px 1fr; row-gap: 14px; font-size: 0.92rem;">
-                    <div style="font-weight: 600; color: #64748B;">Math Tolerance (Rounding Cents):</div>
-                    <div style="font-weight: 700; color: #0F172A;">${verification.TOLERANCE}</div>
+                    <div style="font-weight: 600; color: #94A3B8;">Math Tolerance (Rounding Cents):</div>
+                    <div style="font-weight: 700; color: #F8FAFC;">${verification.TOLERANCE}</div>
                     
-                    <div style="font-weight: 600; color: #64748B;">Min History for Outliers:</div>
-                    <div style="font-weight: 700; color: #0F172A;">{verification.MIN_HISTORY_FOR_OUTLIERS} prior documents</div>
+                    <div style="font-weight: 600; color: #94A3B8;">Min History for Outliers:</div>
+                    <div style="font-weight: 700; color: #F8FAFC;">{verification.MIN_HISTORY_FOR_OUTLIERS} prior documents</div>
                     
-                    <div style="font-weight: 600; color: #64748B;">Outlier Robust Z-Score:</div>
-                    <div style="font-weight: 700; color: #0F172A;">{verification.OUTLIER_Z_THRESHOLD}</div>
+                    <div style="font-weight: 600; color: #94A3B8;">Outlier Robust Z-Score:</div>
+                    <div style="font-weight: 700; color: #F8FAFC;">{verification.OUTLIER_Z_THRESHOLD}</div>
                     
-                    <div style="font-weight: 600; color: #64748B;">Max Sanity Invoice Age:</div>
-                    <div style="font-weight: 700; color: #0F172A;">{verification.MAX_AGE_YEARS} years</div>
+                    <div style="font-weight: 600; color: #94A3B8;">Max Sanity Invoice Age:</div>
+                    <div style="font-weight: 700; color: #F8FAFC;">{verification.MAX_AGE_YEARS} years</div>
                 </div>
             </div>
             """,

@@ -48,6 +48,19 @@ if USE_EMULATOR:
     os.environ["FIREBASE_AUTH_EMULATOR_HOST"] = AUTH_EMU_HOST
     os.environ["STORAGE_EMULATOR_HOST"] = f"http://{STORAGE_EMU_HOST}"
     os.environ["GCLOUD_PROJECT"] = PROJECT_ID
+else:
+    # Ensure local emulator host variables are removed so cloud SDK targets actual production services
+    for emu_var in ["FIRESTORE_EMULATOR_HOST", "FIREBASE_AUTH_EMULATOR_HOST", "STORAGE_EMULATOR_HOST"]:
+        os.environ.pop(emu_var, None)
+
+# In-memory query cache for hyper-reactive UI performance (TTL 20 seconds)
+_QUERY_CACHE: Dict[str, Tuple[float, Any]] = {}
+CACHE_TTL_SECONDS = 20.0
+
+
+def invalidate_cache():
+    """Invalidate query cache immediately upon document mutations."""
+    _QUERY_CACHE.clear()
 
 import firebase_admin
 from firebase_admin import auth as admin_auth
@@ -332,6 +345,7 @@ def create_document_record(
     else:
         _LOCAL_STORE.documents[doc_id] = doc_data
 
+    invalidate_cache()
     log_audit_event(owner_uid, doc_id, "DOCUMENT_UPLOADED", {"filename": file_metadata.get("filename")})
     return doc_id
 
@@ -380,6 +394,7 @@ def save_document_analysis(
             for idx, item in enumerate(line_items):
                 item_id = f"item_{idx+1:03d}"
                 doc_ref.collection("lineItems").document(item_id).set(item)
+            invalidate_cache()
             return
         elif not USE_EMULATOR:
             raise RuntimeError("Cloud Firestore is unreachable in production.")
@@ -397,6 +412,7 @@ def save_document_analysis(
     _LOCAL_STORE.line_items[doc_id] = {
         f"item_{idx+1:03d}": it for idx, it in enumerate(line_items)
     }
+    invalidate_cache()
 
 
 def get_document(doc_id: str) -> Optional[Dict[str, Any]]:
@@ -500,6 +516,13 @@ def log_audit_event(
 
 def get_dashboard_metrics(owner_uid: Optional[str] = None) -> Dict[str, Any]:
     """Compute real dashboard KPI metrics using Firestore queries and real record aggregations."""
+    cache_key = f"kpis_{owner_uid or 'all'}"
+    now = time.time()
+    if cache_key in _QUERY_CACHE:
+        ts, val = _QUERY_CACHE[cache_key]
+        if now - ts < CACHE_TTL_SECONDS:
+            return val
+
     kpis = {
         "total_documents": 0,
         "verified_count": 0,
@@ -524,63 +547,68 @@ def get_dashboard_metrics(owner_uid: Optional[str] = None) -> Dict[str, Any]:
         if _FIRESTORE_CLIENT:
             from google.cloud.firestore import FieldFilter
 
-            coll = _FIRESTORE_CLIENT.collection("documents")
-            if owner_uid:
-                coll = coll.where(filter=FieldFilter("ownerUid", "==", owner_uid))
+            try:
+                coll = _FIRESTORE_CLIENT.collection("documents")
+                if owner_uid:
+                    coll = coll.where(filter=FieldFilter("ownerUid", "==", owner_uid))
 
-            # Stream documents for aggregations (up to 200 documents)
-            stream_docs = [d.to_dict() for d in coll.order_by("createdAt", direction=firestore.Query.DESCENDING).limit(200).stream()]
-            kpis["total_documents"] = len(stream_docs)
+                # Stream documents for aggregations (up to 200 documents)
+                stream_docs = [d.to_dict() for d in coll.order_by("createdAt", direction=firestore.Query.DESCENDING).limit(200).stream()]
+                kpis["total_documents"] = len(stream_docs)
 
-            total_val = 0.0
-            trends = {}
-            for d in stream_docs:
-                risk_lvl = d.get("risk", {}).get("level", "LOW")
-                if risk_lvl == "HIGH":
-                    kpis["high_risk_count"] += 1
-                    kpis["flagged_count"] += 1
-                elif risk_lvl == "MEDIUM":
-                    kpis["medium_risk_count"] += 1
-                else:
-                    kpis["normal_count"] += 1
+                total_val = 0.0
+                trends = {}
+                for d in stream_docs:
+                    risk_lvl = d.get("risk", {}).get("level", "LOW")
+                    if risk_lvl == "HIGH":
+                        kpis["high_risk_count"] += 1
+                        kpis["flagged_count"] += 1
+                    elif risk_lvl == "MEDIUM":
+                        kpis["medium_risk_count"] += 1
+                    else:
+                        kpis["normal_count"] += 1
 
-                st_val = d.get("status", "")
-                if st_val in ["verified", "decided"]:
-                    kpis["verified_count"] += 1
+                    st_val = d.get("status", "")
+                    if st_val in ["verified", "decided"]:
+                        kpis["verified_count"] += 1
 
-                rev = d.get("review") or {}
-                dec = rev.get("decision")
-                if dec == "approved":
-                    kpis["approved_count"] += 1
-                elif dec == "rejected":
-                    kpis["rejected_count"] += 1
+                    rev = d.get("review") or {}
+                    dec = rev.get("decision")
+                    if dec == "approved":
+                        kpis["approved_count"] += 1
+                    elif dec == "rejected":
+                        kpis["rejected_count"] += 1
 
-                dups = d.get("verification", {}).get("duplicateMatches", [])
-                if dups or d.get("risk", {}).get("breakdown", {}).get("duplicate_contribution", 0) > 0:
-                    kpis["duplicates_count"] += 1
+                    dups = d.get("verification", {}).get("duplicateMatches", [])
+                    if dups or d.get("risk", {}).get("breakdown", {}).get("duplicate_contribution", 0) > 0:
+                        kpis["duplicates_count"] += 1
 
-                # Sum total invoice amount
-                f_tot = d.get("fields", {}).get("total")
-                if f_tot:
-                    try:
-                        total_val += float(f_tot)
-                    except Exception:
-                        pass
+                    # Sum total invoice amount
+                    f_tot = d.get("fields", {}).get("total")
+                    if f_tot:
+                        try:
+                            total_val += float(f_tot)
+                        except Exception:
+                            pass
 
-                # Monthly trends
-                ca = str(d.get("createdAt", ""))[:7]
-                if ca and len(ca) == 7:
-                    trends[ca] = trends.get(ca, 0) + 1
+                    # Monthly trends
+                    ca = str(d.get("createdAt", ""))[:7]
+                    if ca and len(ca) == 7:
+                        trends[ca] = trends.get(ca, 0) + 1
 
-            kpis["total_invoice_value"] = round(total_val, 2)
-            kpis["pending_reviews"] = max(0, kpis["total_documents"] - (kpis["approved_count"] + kpis["rejected_count"]))
-            if kpis["total_documents"] > 0:
-                kpis["verification_success_rate"] = round((kpis["normal_count"] / kpis["total_documents"]) * 100.0, 1)
+                kpis["total_invoice_value"] = round(total_val, 2)
+                kpis["pending_reviews"] = max(0, kpis["total_documents"] - (kpis["approved_count"] + kpis["rejected_count"]))
+                if kpis["total_documents"] > 0:
+                    kpis["verification_success_rate"] = round((kpis["normal_count"] / kpis["total_documents"]) * 100.0, 1)
 
-            kpis["recent_documents"] = stream_docs[:10]
-            kpis["recent_suspicious"] = [d for d in stream_docs if d.get("risk", {}).get("level") == "HIGH"][:5]
-            kpis["monthly_trends"] = dict(sorted(trends.items()))
-            return kpis
+                kpis["recent_documents"] = stream_docs[:10]
+                kpis["recent_suspicious"] = [d for d in stream_docs if d.get("risk", {}).get("level") == "HIGH"][:5]
+                kpis["monthly_trends"] = dict(sorted(trends.items()))
+                _QUERY_CACHE[cache_key] = (time.time(), kpis)
+                return kpis
+            except Exception as ex:
+                import logging
+                logging.getLogger(__name__).warning("Firestore dashboard query failed; using local fallback: %s", ex)
         elif not USE_EMULATOR:
             raise RuntimeError("Cloud Firestore is unreachable in production.")
 
@@ -637,6 +665,7 @@ def get_dashboard_metrics(owner_uid: Optional[str] = None) -> Dict[str, Any]:
     kpis["recent_documents"] = docs_sorted[:10]
     kpis["recent_suspicious"] = [d for d in docs_sorted if d.get("risk", {}).get("level") == "HIGH"][:5]
     kpis["monthly_trends"] = dict(sorted(trends.items()))
+    _QUERY_CACHE[cache_key] = (time.time(), kpis)
     return kpis
 
 
@@ -723,18 +752,31 @@ def list_documents(
     owner_uid: Optional[str] = None,
     limit: int = 50,
 ) -> List[Dict[str, Any]]:
-    """List documents for table display."""
+    """List documents for table display with micro-caching for instant UI reactivity."""
+    cache_key = f"docs_{owner_uid or 'all'}_{limit}"
+    now = time.time()
+    if cache_key in _QUERY_CACHE:
+        ts, val = _QUERY_CACHE[cache_key]
+        if now - ts < CACHE_TTL_SECONDS:
+            return val
+
     if not USE_EMULATOR or (_EMULATOR_REACHABLE and _FIRESTORE_CLIENT):
         if _FIRESTORE_CLIENT is None:
             initialize_firebase()
         if _FIRESTORE_CLIENT:
             from google.cloud.firestore import FieldFilter
 
-            coll = _FIRESTORE_CLIENT.collection("documents")
-            if owner_uid:
-                coll = coll.where(filter=FieldFilter("ownerUid", "==", owner_uid))
-            stream = coll.order_by("createdAt", direction=firestore.Query.DESCENDING).limit(limit).stream()
-            return [d.to_dict() for d in stream]
+            try:
+                coll = _FIRESTORE_CLIENT.collection("documents")
+                if owner_uid:
+                    coll = coll.where(filter=FieldFilter("ownerUid", "==", owner_uid))
+                stream = coll.order_by("createdAt", direction=firestore.Query.DESCENDING).limit(limit).stream()
+                res = [d.to_dict() for d in stream]
+                _QUERY_CACHE[cache_key] = (time.time(), res)
+                return res
+            except Exception as ex:
+                import logging
+                logging.getLogger(__name__).warning("Firestore list query failed; using local fallback: %s", ex)
         elif not USE_EMULATOR:
             raise RuntimeError("Cloud Firestore is unreachable in production.")
 
@@ -742,7 +784,9 @@ def list_documents(
     if owner_uid:
         docs = [d for d in docs if d.get("ownerUid") == owner_uid]
     docs.sort(key=lambda d: d.get("createdAt", ""), reverse=True)
-    return docs[:limit]
+    res = docs[:limit]
+    _QUERY_CACHE[cache_key] = (time.time(), res)
+    return res
 
 
 # -------------------------------------------------------------------------

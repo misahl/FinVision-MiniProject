@@ -188,7 +188,7 @@ def render_admin(user: Dict[str, Any]):
                 f"""
                 <div class="fin-card">
                     <div class="fin-card-title">Firebase Project</div>
-                    <div style="font-weight: 700; color: #0F172A;">{health.get('projectId')}</div>
+                    <div style="font-weight: 700; color: #F8FAFC;">{health.get('projectId')}</div>
                     <div class="fin-card-subtitle">Region: us-central1</div>
                 </div>
                 """,
@@ -199,7 +199,7 @@ def render_admin(user: Dict[str, Any]):
                 f"""
                 <div class="fin-card">
                     <div class="fin-card-title">Cloud Storage Bucket</div>
-                    <div style="font-weight: 700; color: #0F172A;">{health.get('storageBucket')}</div>
+                    <div style="font-weight: 700; color: #F8FAFC;">{health.get('storageBucket')}</div>
                     <div class="fin-card-subtitle">Status: {health.get('storage')}</div>
                 </div>
                 """,
@@ -210,7 +210,7 @@ def render_admin(user: Dict[str, Any]):
                 f"""
                 <div class="fin-card">
                     <div class="fin-card-title">Cloud Run Service</div>
-                    <div style="font-weight: 700; color: #0F172A;">finvision</div>
+                    <div style="font-weight: 700; color: #F8FAFC;">finvision</div>
                     <div class="fin-card-subtitle">ADC Active: True</div>
                 </div>
                 """,

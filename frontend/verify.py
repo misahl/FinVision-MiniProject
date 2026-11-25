@@ -71,7 +71,7 @@ def render_verify(user: dict):
             f"""
             <div class="fin-card" style="padding: 14px 18px; margin-bottom: 0;">
                 <div class="fin-card-title">Processing Status</div>
-                <div style="font-weight: 700; font-size: 1.15rem; color: #0F172A;">{doc.get('status', 'verified').title()}</div>
+                <div style="font-weight: 700; font-size: 1.15rem; color: #F8FAFC;">{doc.get('status', 'verified').title()}</div>
             </div>
             """,
             unsafe_allow_html=True,
@@ -93,7 +93,7 @@ def render_verify(user: dict):
             f"""
             <div class="fin-card" style="padding: 14px 18px; margin-bottom: 0;">
                 <div class="fin-card-title">OCR Confidence</div>
-                <div style="font-weight: 700; font-size: 1.15rem; color: #0F172A;">{doc.get('overallConfidence', 0):.1f}%</div>
+                <div style="font-weight: 700; font-size: 1.15rem; color: #F8FAFC;">{doc.get('overallConfidence', 0):.1f}%</div>
             </div>
             """,
             unsafe_allow_html=True,
@@ -122,10 +122,10 @@ def render_verify(user: dict):
         # Document metadata
         st.markdown(
             f"""
-            <div style="background-color: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 8px; padding: 12px; margin-top: 10px; font-size: 0.82rem; color: #475569;">
-                <div><b>Filename:</b> {file_info.get('filename', 'N/A')}</div>
-                <div><b>SHA-256:</b> <span style="font-family: monospace;">{file_info.get('sha256', 'N/A')[:20]}...</span></div>
-                <div><b>pHash:</b> <span style="font-family: monospace;">{file_info.get('pHash', 'N/A')}</span></div>
+            <div style="background-color: #111827; border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 12px; margin-top: 10px; font-size: 0.82rem; color: #94A3B8;">
+                <div><b>Filename:</b> <span style="color: #F8FAFC;">{file_info.get('filename', 'N/A')}</span></div>
+                <div><b>SHA-256:</b> <span style="font-family: monospace; color: #60A5FA;">{file_info.get('sha256', 'N/A')[:20]}...</span></div>
+                <div><b>pHash:</b> <span style="font-family: monospace; color: #A78BFA;">{file_info.get('pHash', 'N/A')}</span></div>
                 <div><b>Created:</b> {doc.get('createdAt', 'N/A')}</div>
             </div>
             """,
@@ -204,10 +204,10 @@ def render_verify(user: dict):
 
             st.markdown(
                 f"""
-                <div style="background-color: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 8px; padding: 14px; margin-bottom: 12px;">
+                <div style="background-color: #111827; border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 14px; margin-bottom: 12px; color: #E2E8F0;">
                     <div><b>Model Verdict:</b> <span style="font-weight: 700; color: {'#EF4444' if verdict == 'suspicious' else '#10B981'};">{verdict.upper()}</span></div>
-                    <div><b>Suspiciousness Probability:</b> {ml_prob * 100:.1f}%</div>
-                    <div><b>Model Registry:</b> {ml.get('modelVersion', 'v1.0.0')} (Random Forest Baseline)</div>
+                    <div><b>Suspiciousness Probability:</b> <span style="color: #60A5FA; font-weight: 600;">{ml_prob * 100:.1f}%</span></div>
+                    <div style="color: #94A3B8; font-size: 0.82rem; margin-top: 4px;"><b>Model Registry:</b> {ml.get('modelVersion', 'v1.0.0')} (Random Forest Baseline)</div>
                 </div>
                 """,
                 unsafe_allow_html=True,

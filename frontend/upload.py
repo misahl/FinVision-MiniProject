@@ -339,6 +339,11 @@ def render_upload(user: Dict[str, Any]):
 
                         st.markdown(f"**Recommended Action:** {result['risk']['recommendedAction']}")
 
+                        if st.button("🔍 Open in Verification Workspace", type="primary", key="goto_verify_after_upload"):
+                            st.session_state["selected_doc_id"] = result["docId"]
+                            st.session_state["nav_page"] = "Verification Results"
+                            st.rerun()
+
         else:
             # Batch upload processing
             if st.button(f"⚡ Ingest & Process All {len(active_files)} Documents in Batch", type="primary"):

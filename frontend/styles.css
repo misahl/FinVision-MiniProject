@@ -1,41 +1,110 @@
 /* ===============================================================
-   FinVision Fintech Design System (Stripe / Linear Inspired)
-   Light Mode Enforced, High-Contrast, Clean & Readable
+   FinVision 2.0 Ultra-Modern Fintech Design System (Linear / Stripe Inspired)
+   High-Contrast Executive Dark Palette, Micro-Interactions & Zero-Lag Layout
    =============================================================== */
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+/* --- Root Variables --- */
+:root {
+    --bg-base: #0B0F19;
+    --bg-card: #111827;
+    --bg-card-hover: #172033;
+    --border-subtle: rgba(255, 255, 255, 0.08);
+    --border-hover: rgba(96, 165, 250, 0.35);
+    --text-primary: #F8FAFC;
+    --text-secondary: #94A3B8;
+    --text-muted: #64748B;
+    --accent-blue: #3B82F6;
+    --accent-emerald: #10B981;
+    --accent-amber: #F59E0B;
+    --accent-rose: #EF4444;
+}
 
 /* --- Global Reset & Typography --- */
 html, body, [class*="css"], .stApp {
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
-    background-color: #F8FAFC !important;
-    color: #0F172A !important;
+    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+    background-color: var(--bg-base) !important;
+    color: var(--text-primary) !important;
 }
 
-/* Headings in Main Content Area */
-.main h1, .main h2, .main h3, .main h4, .main h5, .main h6,
+/* Streamlit Header / Toolbar cleanup */
+header[data-testid="stHeader"] {
+    background: transparent !important;
+    backdrop-filter: blur(8px) !important;
+}
+
+/* Headings */
+h1, h2, h3, h4, h5, h6,
+.main h1, .main h2, .main h3, .main h4,
 section.main h1, section.main h2, section.main h3 {
-    color: #0F172A !important;
+    color: var(--text-primary) !important;
     font-weight: 700 !important;
-    letter-spacing: -0.02em !important;
+    letter-spacing: -0.025em !important;
 }
 
-.main h1 { font-size: 1.85rem !important; margin-bottom: 0.5rem !important; }
-.main h2 { font-size: 1.45rem !important; margin-top: 1rem !important; margin-bottom: 0.4rem !important; }
-.main h3 { font-size: 1.15rem !important; margin-top: 0.8rem !important; margin-bottom: 0.4rem !important; }
+.main h1 { font-size: 1.85rem !important; margin-bottom: 0.4rem !important; }
+.main h2 { font-size: 1.4rem !important; margin-top: 0.8rem !important; margin-bottom: 0.3rem !important; }
+.main h3 { font-size: 1.15rem !important; margin-top: 0.6rem !important; margin-bottom: 0.3rem !important; }
 
 .main p, .main span, .main div {
-    color: #334155;
+    color: var(--text-secondary);
+}
+
+/* --- Top Navigation Header Bar --- */
+.fin-topbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: linear-gradient(180deg, rgba(17, 24, 39, 0.95) 0%, rgba(15, 23, 42, 0.85) 100%);
+    border: 1px solid var(--border-subtle);
+    border-radius: 14px;
+    padding: 12px 20px;
+    margin-bottom: 20px;
+    box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(12px);
+}
+
+.fin-brand-title {
+    font-size: 1.25rem;
+    font-weight: 800;
+    color: #FFFFFF !important;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    letter-spacing: -0.02em;
+}
+
+.fin-status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 4px 12px;
+    background: rgba(16, 185, 129, 0.12);
+    color: #34D399;
+    border: 1px solid rgba(16, 185, 129, 0.25);
+    border-radius: 9999px;
+}
+
+.fin-status-dot {
+    width: 7px;
+    height: 7px;
+    background-color: #10B981;
+    border-radius: 50%;
+    box-shadow: 0 0 8px #10B981;
 }
 
 /* --- Form Widget Labels --- */
 label, label p, label span,
 div[data-testid="stWidgetLabel"] p,
 div[data-testid="stWidgetLabel"] label {
-    color: #1E293B !important;
-    font-size: 0.88rem !important;
+    color: #E2E8F0 !important;
+    font-size: 0.85rem !important;
     font-weight: 600 !important;
     margin-bottom: 4px !important;
+    letter-spacing: 0.01em !important;
 }
 
 /* --- Input Fields (Text, Number, TextArea) --- */
@@ -45,106 +114,128 @@ input[type="password"],
 div[data-baseweb="input"] input,
 div[data-baseweb="textarea"] textarea,
 textarea {
-    background-color: #FFFFFF !important;
-    color: #0F172A !important;
-    border: 1.5px solid #CBD5E1 !important;
+    background-color: #161F30 !important;
+    color: #F8FAFC !important;
+    border: 1.5px solid #2D3748 !important;
     border-radius: 8px !important;
-    font-size: 0.92rem !important;
+    font-size: 0.9rem !important;
     font-weight: 500 !important;
-    padding: 8px 12px !important;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04) !important;
+    padding: 9px 14px !important;
+    transition: all 0.15s ease !important;
 }
 
 input[type="text"]:focus,
 input[type="number"]:focus,
 textarea:focus,
 div[data-baseweb="input"]:focus-within {
-    border-color: #2563EB !important;
-    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15) !important;
+    border-color: #3B82F6 !important;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25) !important;
     outline: none !important;
 }
 
 /* Number Input Stepper Buttons (+ / -) */
 div[data-testid="stNumberInput"] button {
-    background-color: #F1F5F9 !important;
-    color: #334155 !important;
-    border: 1px solid #CBD5E1 !important;
+    background-color: #1F2937 !important;
+    color: #E2E8F0 !important;
+    border: 1px solid #374151 !important;
 }
 
 div[data-testid="stNumberInput"] button:hover {
-    background-color: #E2E8F0 !important;
-    color: #0F172A !important;
+    background-color: #374151 !important;
+    color: #FFFFFF !important;
 }
 
 /* --- Selectbox & Dropdowns --- */
 div[data-baseweb="select"] {
-    background-color: #FFFFFF !important;
+    background-color: #161F30 !important;
     border-radius: 8px !important;
 }
 
 div[data-baseweb="select"] > div {
-    background-color: #FFFFFF !important;
-    color: #0F172A !important;
-    border: 1.5px solid #CBD5E1 !important;
+    background-color: #161F30 !important;
+    color: #F8FAFC !important;
+    border: 1.5px solid #2D3748 !important;
     border-radius: 8px !important;
 }
 
 div[data-baseweb="select"] * {
-    color: #0F172A !important;
+    color: #F8FAFC !important;
 }
 
 div[data-baseweb="popover"],
 div[data-baseweb="menu"],
 ul[role="listbox"] {
-    background-color: #FFFFFF !important;
-    border: 1px solid #E2E8F0 !important;
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1) !important;
+    background-color: #161F30 !important;
+    border: 1px solid #374151 !important;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.6) !important;
 }
 
 ul[role="listbox"] li {
-    color: #0F172A !important;
-    background-color: #FFFFFF !important;
+    color: #F8FAFC !important;
+    background-color: #161F30 !important;
 }
 
 ul[role="listbox"] li:hover,
 ul[role="listbox"] li[aria-selected="true"] {
-    background-color: #EFF6FF !important;
-    color: #1D4ED8 !important;
+    background-color: #1E3A8A !important;
+    color: #93C5FD !important;
+}
+
+/* --- Segmented Control / Modern Pills --- */
+div[data-testid="stSegmentedControl"] {
+    background-color: #111827 !important;
+    border: 1px solid var(--border-subtle) !important;
+    border-radius: 10px !important;
+    padding: 4px !important;
+}
+
+div[data-testid="stSegmentedControl"] button {
+    border-radius: 7px !important;
+    font-size: 0.85rem !important;
+    font-weight: 600 !important;
+    color: #94A3B8 !important;
+    transition: all 0.15s ease !important;
+}
+
+div[data-testid="stSegmentedControl"] button[aria-selected="true"] {
+    background-color: #2563EB !important;
+    color: #FFFFFF !important;
+    box-shadow: 0 2px 8px rgba(37, 99, 235, 0.4) !important;
 }
 
 /* --- Tabs --- */
 div[data-baseweb="tab-list"] {
-    border-bottom: 2px solid #E2E8F0 !important;
+    border-bottom: 1.5px solid #1E293B !important;
     gap: 8px !important;
     background-color: transparent !important;
 }
 
 button[data-baseweb="tab"] {
     background-color: transparent !important;
-    color: #64748B !important;
-    font-size: 0.92rem !important;
+    color: #94A3B8 !important;
+    font-size: 0.9rem !important;
     font-weight: 600 !important;
-    padding: 10px 16px !important;
+    padding: 10px 18px !important;
     border: none !important;
     border-radius: 6px 6px 0 0 !important;
     transition: all 0.15s ease-in-out !important;
 }
 
 button[data-baseweb="tab"]:hover {
-    color: #1E293B !important;
-    background-color: #F1F5F9 !important;
+    color: #F8FAFC !important;
+    background-color: rgba(255, 255, 255, 0.04) !important;
 }
 
 button[data-baseweb="tab"][aria-selected="true"] {
-    color: #2563EB !important;
+    color: #60A5FA !important;
     font-weight: 700 !important;
-    border-bottom: 3px solid #2563EB !important;
+    border-bottom: 2.5px solid #3B82F6 !important;
 }
 
-/* --- Sidebar: Deep Executive Navy --- */
+/* --- Sidebar --- */
 section[data-testid="stSidebar"] {
-    background-color: #0F172A !important;
-    border-right: 1px solid #1E293B !important;
+    background-color: #0D121F !important;
+    border-right: 1px solid var(--border-subtle) !important;
 }
 
 section[data-testid="stSidebar"] h1,
@@ -153,36 +244,31 @@ section[data-testid="stSidebar"] h3 {
     color: #F8FAFC !important;
 }
 
-section[data-testid="stSidebar"] p,
-section[data-testid="stSidebar"] span,
-section[data-testid="stSidebar"] label {
-    color: #CBD5E1 !important;
-}
-
 section[data-testid="stSidebar"] div[role="radiogroup"] label {
     background-color: transparent !important;
-    padding: 10px 14px !important;
+    padding: 9px 12px !important;
     border-radius: 8px !important;
     margin-bottom: 4px !important;
-    transition: all 0.15s ease-in-out !important;
+    transition: all 0.15s ease !important;
 }
 
 section[data-testid="stSidebar"] div[role="radiogroup"] label:hover {
-    background-color: #1E293B !important;
+    background-color: #172033 !important;
 }
 
 section[data-testid="stSidebar"] div[role="radiogroup"] label p {
-    color: #CBD5E1 !important;
-    font-size: 0.92rem !important;
+    color: #94A3B8 !important;
+    font-size: 0.88rem !important;
     font-weight: 500 !important;
 }
 
 section[data-testid="stSidebar"] div[role="radiogroup"] label:hover p {
-    color: #FFFFFF !important;
+    color: #F8FAFC !important;
 }
 
 section[data-testid="stSidebar"] div[role="radiogroup"] label[data-checked="true"] {
-    background-color: #1E3A8A !important;
+    background: linear-gradient(90deg, #1E3A8A 0%, #172554 100%) !important;
+    border-left: 3px solid #3B82F6 !important;
 }
 
 section[data-testid="stSidebar"] div[role="radiogroup"] label[data-checked="true"] p {
@@ -190,139 +276,190 @@ section[data-testid="stSidebar"] div[role="radiogroup"] label[data-checked="true
     font-weight: 700 !important;
 }
 
-/* --- KPI Cards --- */
+/* --- Executive Glass KPI Cards --- */
 .fin-card {
-    background: #FFFFFF !important;
-    border: 1px solid #E2E8F0 !important;
+    background: linear-gradient(145deg, #131C2E 0%, #0F172A 100%) !important;
+    border: 1px solid var(--border-subtle) !important;
     border-radius: 12px !important;
     padding: 18px 20px !important;
-    box-shadow: 0 1px 3px 0 rgba(15, 23, 42, 0.05) !important;
-    margin-bottom: 12px !important;
+    box-shadow: 0 4px 15px -3px rgba(0, 0, 0, 0.4) !important;
+    transition: transform 0.15s ease, border-color 0.15s ease !important;
+    position: relative;
+    overflow: hidden;
+}
+
+.fin-card:hover {
+    transform: translateY(-2px) !important;
+    border-color: var(--border-hover) !important;
+}
+
+.fin-card::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, #3B82F6 0%, rgba(59, 130, 246, 0) 100%);
 }
 
 .fin-card-title {
-    font-size: 0.8rem !important;
+    font-size: 0.76rem !important;
     font-weight: 600 !important;
     text-transform: uppercase !important;
-    letter-spacing: 0.06em !important;
-    color: #64748B !important;
+    letter-spacing: 0.08em !important;
+    color: #94A3B8 !important;
     margin-bottom: 6px !important;
 }
 
 .fin-card-value {
     font-size: 1.85rem !important;
     font-weight: 800 !important;
-    color: #0F172A !important;
+    color: #F8FAFC !important;
     line-height: 1.1 !important;
+    letter-spacing: -0.02em !important;
 }
 
 .fin-card-subtitle {
-    font-size: 0.8rem !important;
-    color: #94A3B8 !important;
+    font-size: 0.78rem !important;
+    color: #64748B !important;
     margin-top: 6px !important;
 }
 
-/* --- Risk Badges --- */
+/* --- Modern Risk Badges --- */
 .badge-low {
-    display: inline-block !important;
-    background-color: #DCFCE7 !important;
-    color: #166534 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    background-color: rgba(16, 185, 129, 0.15) !important;
+    color: #34D399 !important;
     font-weight: 700 !important;
-    padding: 4px 12px !important;
+    padding: 3px 11px !important;
     border-radius: 9999px !important;
-    font-size: 0.82rem !important;
-    border: 1px solid #86EFAC !important;
+    font-size: 0.78rem !important;
+    border: 1px solid rgba(16, 185, 129, 0.3) !important;
+    letter-spacing: 0.03em !important;
 }
 
 .badge-medium {
-    display: inline-block !important;
-    background-color: #FEF3C7 !important;
-    color: #92400E !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    background-color: rgba(245, 158, 11, 0.15) !important;
+    color: #FBBF24 !important;
     font-weight: 700 !important;
-    padding: 4px 12px !important;
+    padding: 3px 11px !important;
     border-radius: 9999px !important;
-    font-size: 0.82rem !important;
-    border: 1px solid #FCD34D !important;
+    font-size: 0.78rem !important;
+    border: 1px solid rgba(245, 158, 11, 0.3) !important;
+    letter-spacing: 0.03em !important;
 }
 
 .badge-high {
-    display: inline-block !important;
-    background-color: #FEE2E2 !important;
-    color: #991B1B !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    background-color: rgba(239, 68, 68, 0.15) !important;
+    color: #F87171 !important;
     font-weight: 700 !important;
-    padding: 4px 12px !important;
+    padding: 3px 11px !important;
     border-radius: 9999px !important;
-    font-size: 0.82rem !important;
-    border: 1px solid #FCA5A5 !important;
+    font-size: 0.78rem !important;
+    border: 1px solid rgba(239, 68, 68, 0.3) !important;
+    letter-spacing: 0.03em !important;
 }
 
-/* --- Rule Cards --- */
+/* --- Verification Rule Cards --- */
 .rule-item-pass {
-    background-color: #FFFFFF !important;
-    border: 1px solid #E2E8F0 !important;
-    border-left: 5px solid #10B981 !important;
+    background-color: #131E2E !important;
+    border: 1px solid rgba(16, 185, 129, 0.25) !important;
+    border-left: 4px solid #10B981 !important;
     border-radius: 8px !important;
-    padding: 14px 18px !important;
-    margin-bottom: 10px !important;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03) !important;
+    padding: 13px 16px !important;
+    margin-bottom: 8px !important;
 }
 
 .rule-item-fail {
-    background-color: #FFF5F5 !important;
-    border: 1px solid #FECACA !important;
-    border-left: 5px solid #EF4444 !important;
+    background-color: #24141E !important;
+    border: 1px solid rgba(239, 68, 68, 0.35) !important;
+    border-left: 4px solid #EF4444 !important;
     border-radius: 8px !important;
-    padding: 14px 18px !important;
-    margin-bottom: 10px !important;
+    padding: 13px 16px !important;
+    margin-bottom: 8px !important;
 }
 
 .rule-item-warn {
-    background-color: #FFFBEB !important;
-    border: 1px solid #FDE68A !important;
-    border-left: 5px solid #F59E0B !important;
+    background-color: #241C14 !important;
+    border: 1px solid rgba(245, 158, 11, 0.3) !important;
+    border-left: 4px solid #F59E0B !important;
     border-radius: 8px !important;
-    padding: 14px 18px !important;
-    margin-bottom: 10px !important;
+    padding: 13px 16px !important;
+    margin-bottom: 8px !important;
 }
 
-/* --- Primary Buttons --- */
+/* --- Buttons --- */
 button[kind="primary"],
 .stButton > button[kind="primary"] {
-    background-color: #2563EB !important;
+    background: linear-gradient(180deg, #3B82F6 0%, #2563EB 100%) !important;
     color: #FFFFFF !important;
     border: none !important;
     border-radius: 8px !important;
     font-weight: 600 !important;
-    padding: 10px 18px !important;
-    box-shadow: 0 1px 2px rgba(37, 99, 235, 0.2) !important;
+    padding: 9px 18px !important;
+    box-shadow: 0 2px 10px rgba(37, 99, 235, 0.4) !important;
+    transition: all 0.15s ease !important;
 }
 
 button[kind="primary"]:hover {
-    background-color: #1D4ED8 !important;
-    color: #FFFFFF !important;
+    background: linear-gradient(180deg, #60A5FA 0%, #3B82F6 100%) !important;
+    transform: translateY(-1px) !important;
 }
 
 button[kind="secondary"],
 .stButton > button {
-    background-color: #FFFFFF !important;
-    color: #1E293B !important;
-    border: 1.5px solid #CBD5E1 !important;
+    background-color: #161F30 !important;
+    color: #E2E8F0 !important;
+    border: 1px solid #2D3748 !important;
     border-radius: 8px !important;
     font-weight: 600 !important;
     padding: 9px 16px !important;
+    transition: all 0.15s ease !important;
 }
 
 button[kind="secondary"]:hover,
 .stButton > button:hover {
-    background-color: #F8FAFC !important;
-    border-color: #94A3B8 !important;
-    color: #0F172A !important;
+    background-color: #1F2937 !important;
+    border-color: #4B5563 !important;
+    color: #FFFFFF !important;
 }
 
-/* --- Tables & DataFrames --- */
+/* --- DataFrames & Tables --- */
 div[data-testid="stDataFrame"] {
-    background-color: #FFFFFF !important;
-    border: 1px solid #E2E8F0 !important;
+    background-color: #111827 !important;
+    border: 1px solid var(--border-subtle) !important;
     border-radius: 10px !important;
     overflow: hidden !important;
+}
+
+/* --- Expanders --- */
+div[data-testid="stExpander"] {
+    background-color: #111827 !important;
+    border: 1px solid var(--border-subtle) !important;
+    border-radius: 10px !important;
+}
+
+/* Smooth custom scrollbars */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: #0B0F19;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #1F2937;
+    border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #374151;
 }

@@ -15,6 +15,27 @@ def render_dashboard(user: Dict[str, Any]):
     st.markdown("## 📊 Executive Overview & Portfolio Health")
     st.caption("Real-time portfolio intelligence, arithmetic verification rates, anomaly distribution, and audit summaries.")
 
+    # Quick Launchpad
+    col_act1, col_act2, col_act3, col_act4 = st.columns(4)
+    with col_act1:
+        if st.button("⚡ Ingest & Verify Document", use_container_width=True, type="primary"):
+            st.session_state["nav_page"] = "Upload & Analyze"
+            st.rerun()
+    with col_act2:
+        if st.button("🔍 Review Flagged Queue", use_container_width=True):
+            st.session_state["nav_page"] = "Verification Results"
+            st.rerun()
+    with col_act3:
+        if st.button("🛡️ Duplicate Shield Scan", use_container_width=True):
+            st.session_state["nav_page"] = "Duplicate Detection"
+            st.rerun()
+    with col_act4:
+        if st.button("📄 Export Audit Reports", use_container_width=True):
+            st.session_state["nav_page"] = "Reports"
+            st.rerun()
+
+    st.markdown("<br/>", unsafe_allow_html=True)
+
     # Retrieve real metrics from Firestore aggregation queries
     owner_uid = None if user.get("role") == "admin" else user.get("uid")
     kpis = firebase_service.get_dashboard_metrics(owner_uid)
@@ -22,17 +43,17 @@ def render_dashboard(user: Dict[str, Any]):
     # 1. Primary Executive KPI Row (6 cards)
     c1, c2, c3, c4, c5, c6 = st.columns(6)
     with c1:
-        render_kpi_card("Total Invoices", kpis.get("total_documents", 0), "Processed portfolio")
+        render_kpi_card("Total Invoices", kpis.get("total_documents", 0), "Portfolio intake", "↑ active")
     with c2:
-        render_kpi_card("Total Value", f"${kpis.get('total_invoice_value', 0.0):,.2f}", "Audited transaction sum")
+        render_kpi_card("Audited Value", f"${kpis.get('total_invoice_value', 0.0):,.2f}", "Total transaction volume")
     with c3:
-        render_kpi_card("Verified", kpis.get("verified_count", 0), "Completed checks")
+        render_kpi_card("Verified Clean", kpis.get("verified_count", 0), "100% arithmetic pass", "✓ clean")
     with c4:
-        render_kpi_card("Flagged High Risk", kpis.get("high_risk_count", 0), "Manual review required")
+        render_kpi_card("Flagged High Risk", kpis.get("high_risk_count", 0), "Discrepancy / Collision", "⚠ review")
     with c5:
-        render_kpi_card("Duplicates", kpis.get("duplicates_count", 0), "Potential collisions")
+        render_kpi_card("Duplicates", kpis.get("duplicates_count", 0), "pHash / SHA matches")
     with c6:
-        render_kpi_card("Success Rate", f"{kpis.get('verification_success_rate', 100.0):.1f}%", "Straight-through eligible")
+        render_kpi_card("Success Rate", f"{kpis.get('verification_success_rate', 100.0):.1f}%", "Straight-through pass")
 
     st.markdown("---")
 
@@ -59,12 +80,14 @@ def render_dashboard(user: Dict[str, Any]):
                     "High Risk": "#EF4444",
                 },
                 hole=0.6,
+                template="plotly_dark",
             )
             fig_pie.update_layout(
                 margin=dict(t=10, b=10, l=10, r=10),
                 height=260,
                 paper_bgcolor="rgba(0,0,0,0)",
                 plot_bgcolor="rgba(0,0,0,0)",
+                font=dict(color="#94A3B8"),
                 showlegend=True,
                 legend=dict(orientation="h", yanchor="bottom", y=-0.2, xanchor="center", x=0.5),
             )
@@ -91,12 +114,14 @@ def render_dashboard(user: Dict[str, Any]):
                     "Rejected": "#EF4444",
                     "Pending Review": "#3B82F6",
                 },
+                template="plotly_dark",
             )
             fig_bar.update_layout(
                 margin=dict(t=10, b=10, l=10, r=10),
                 height=260,
                 paper_bgcolor="rgba(0,0,0,0)",
                 plot_bgcolor="rgba(0,0,0,0)",
+                font=dict(color="#94A3B8"),
                 showlegend=False,
             )
             st.plotly_chart(fig_bar, use_container_width=True)
@@ -113,13 +138,15 @@ def render_dashboard(user: Dict[str, Any]):
                 x="Month",
                 y="Invoices",
                 markers=True,
-                color_discrete_sequence=["#2563EB"],
+                color_discrete_sequence=["#3B82F6"],
+                template="plotly_dark",
             )
             fig_trend.update_layout(
                 margin=dict(t=10, b=10, l=10, r=10),
                 height=260,
                 paper_bgcolor="rgba(0,0,0,0)",
                 plot_bgcolor="rgba(0,0,0,0)",
+                font=dict(color="#94A3B8"),
             )
             st.plotly_chart(fig_trend, use_container_width=True)
         else:
