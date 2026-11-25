@@ -1,5 +1,6 @@
-"""Redesigned Ingest & Verify Workspace for FinVision (Enterprise Dark Mode)."""
+"""Redesigned Ingest & Verify Workspace for FinVision (Apple Pro Light Mode)."""
 
+from datetime import datetime
 from decimal import Decimal
 import io
 import zipfile
@@ -471,50 +472,80 @@ def render_upload(user: Dict[str, Any]):
             except Exception:
                 pass
 
-    # 3. Slim Apple Dropzone with Multiple File & ZIP Archive Support
-    uploaded_files = st.file_uploader(
-        "Upload Invoices (PDF, PNG, JPG, or ZIP archive up to 200MB)",
-        type=["jpg", "jpeg", "png", "pdf", "zip"],
-        accept_multiple_files=True,
-        help="Drag and drop a single invoice scan, multiple invoices, or a ZIP archive containing invoices.",
-    )
+    # 3. Slim Apple Ingest Container: File / Chunk Batch Upload & Live Camera Scan
+    tab_file_upload, tab_camera_scan = st.tabs([
+        "📁 File & Chunk Batch Upload",
+        "📷 Live Camera Document Scan",
+    ])
 
-    if uploaded_files:
-        parsed_files = []
-        for uf in uploaded_files:
-            fname = uf.name
-            fbytes = uf.getvalue()
-            if fname.lower().endswith(".zip"):
-                try:
-                    with zipfile.ZipFile(io.BytesIO(fbytes)) as z:
-                        for zname in z.namelist():
-                            if not zname.startswith("__MACOSX") and zname.lower().endswith((".pdf", ".png", ".jpg", ".jpeg")):
-                                content = z.read(zname)
-                                clean_name = Path(zname).name
-                                parsed_files.append({
-                                    "name": clean_name,
-                                    "bytes": content,
-                                    "size": len(content),
-                                    "type": "application/pdf" if clean_name.lower().endswith(".pdf") else "image/png"
-                                })
-                except Exception as ze:
-                    st.error(f"Error unpacking ZIP: {ze}")
-            else:
-                parsed_files.append({
-                    "name": fname,
-                    "bytes": fbytes,
-                    "size": len(fbytes),
-                    "type": uf.type,
-                })
+    with tab_file_upload:
+        uploaded_files = st.file_uploader(
+            "Upload Invoices (PDF, PNG, JPG, or ZIP archive up to 200MB)",
+            type=["jpg", "jpeg", "png", "pdf", "zip"],
+            accept_multiple_files=True,
+            help="Drag and drop a single invoice scan, multiple invoices, or a ZIP archive containing invoices.",
+        )
 
-        if len(parsed_files) > 1:
-            st.session_state["batch_chunk_files"] = parsed_files
-            st.session_state.pop("active_sample_file", None)
-            st.session_state.pop("uploaded_file_cache", None)
-        elif len(parsed_files) == 1:
-            st.session_state["uploaded_file_cache"] = parsed_files[0]
+        if uploaded_files:
+            parsed_files = []
+            for uf in uploaded_files:
+                fname = uf.name
+                fbytes = uf.getvalue()
+                if fname.lower().endswith(".zip"):
+                    try:
+                        with zipfile.ZipFile(io.BytesIO(fbytes)) as z:
+                            for zname in z.namelist():
+                                if not zname.startswith("__MACOSX") and zname.lower().endswith((".pdf", ".png", ".jpg", ".jpeg")):
+                                    content = z.read(zname)
+                                    clean_name = Path(zname).name
+                                    parsed_files.append({
+                                        "name": clean_name,
+                                        "bytes": content,
+                                        "size": len(content),
+                                        "type": "application/pdf" if clean_name.lower().endswith(".pdf") else "image/png"
+                                    })
+                    except Exception as ze:
+                        st.error(f"Error unpacking ZIP: {ze}")
+                else:
+                    parsed_files.append({
+                        "name": fname,
+                        "bytes": fbytes,
+                        "size": len(fbytes),
+                        "type": uf.type,
+                    })
+
+            if len(parsed_files) > 1:
+                st.session_state["batch_chunk_files"] = parsed_files
+                st.session_state.pop("active_sample_file", None)
+                st.session_state.pop("uploaded_file_cache", None)
+            elif len(parsed_files) == 1:
+                st.session_state["uploaded_file_cache"] = parsed_files[0]
+                st.session_state.pop("active_sample_file", None)
+                st.session_state.pop("batch_chunk_files", None)
+
+    with tab_camera_scan:
+        st.markdown(
+            """
+            <div style="margin: 8px 0 12px 0;">
+                <div style="font-weight: 600; font-size: 0.95rem; color: #1D1D1F;">Real-Time Camera Document Scanner</div>
+                <div style="font-size: 0.82rem; color: #515154;">Position physical paper invoices, receipts, or handheld documentation directly in front of your camera. Take a photo to start AI verification immediately.</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        camera_photo = st.camera_input("Capture invoice with your device camera", label_visibility="collapsed")
+        if camera_photo:
+            photo_bytes = camera_photo.getvalue()
+            photo_name = f"scan_{datetime.now().strftime('%Y%m%d_%H%M%S')}.jpg"
+            st.session_state["uploaded_file_cache"] = {
+                "name": photo_name,
+                "bytes": photo_bytes,
+                "size": len(photo_bytes),
+                "type": "image/jpeg",
+            }
             st.session_state.pop("active_sample_file", None)
             st.session_state.pop("batch_chunk_files", None)
+            st.success(f"✓ Captured scan: `{photo_name}` ready for verification.")
 
     # Check for Batch Mode vs Single Inspection Mode
     batch_files = st.session_state.get("batch_chunk_files")
