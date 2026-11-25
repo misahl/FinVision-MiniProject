@@ -804,11 +804,16 @@ def upload_invoice_bytes(
     storage_path = f"users/{uid}/invoices/{doc_id}/{filename}"
 
     if not USE_EMULATOR:
-        # Production: write directly to Google Cloud Storage
-        bucket = storage.bucket(STORAGE_BUCKET)
-        blob = bucket.blob(storage_path)
-        blob.upload_from_string(file_bytes, content_type=content_type)
-        return storage_path
+        # Production: write directly to Google Cloud Storage with local store fallback
+        try:
+            bucket = storage.bucket(STORAGE_BUCKET)
+            blob = bucket.blob(storage_path)
+            blob.upload_from_string(file_bytes, content_type=content_type)
+            return storage_path
+        except Exception as e:
+            logger.warning(f"Cloud Storage upload failed, caching in local memory: {e}")
+            _LOCAL_STORE.storage_files[storage_path] = file_bytes
+            return storage_path
 
     if _EMULATOR_REACHABLE:
         try:
@@ -826,9 +831,15 @@ def upload_invoice_bytes(
 def download_invoice_bytes(storage_path: str) -> Optional[bytes]:
     """Retrieve invoice file bytes from storage."""
     if not USE_EMULATOR:
-        bucket = storage.bucket(STORAGE_BUCKET)
-        blob = bucket.blob(storage_path)
-        return blob.download_as_bytes()
+        try:
+            bucket = storage.bucket(STORAGE_BUCKET)
+            blob = bucket.blob(storage_path)
+            return blob.download_as_bytes()
+        except Exception as e:
+            logger.warning(f"Cloud Storage download failed, checking local store: {e}")
+            if storage_path in _LOCAL_STORE.storage_files:
+                return _LOCAL_STORE.storage_files[storage_path]
+            return None
 
     if storage_path in _LOCAL_STORE.storage_files:
         return _LOCAL_STORE.storage_files[storage_path]

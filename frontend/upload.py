@@ -141,18 +141,19 @@ def run_pipeline_on_bytes(
 
     new_doc_id = firebase_service.create_document_record(
         owner_uid=owner_uid,
-        file_meta=file_meta,
-        extracted_fields=fields,
-        line_items=line_items,
+        file_metadata=file_meta,
     )
 
     firebase_service.save_document_analysis(
         doc_id=new_doc_id,
+        fields=fields,
+        field_confidence=confidences,
+        line_items=line_items,
         verification_results=verif_results,
-        duplicate_results=dup_results,
         cv_results=cv_results,
         ml_results=ml_pred,
-        risk_results=risk,
+        risk_assessment=risk,
+        storage_path=storage_path,
     )
 
     return {
