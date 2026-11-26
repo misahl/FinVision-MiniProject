@@ -203,3 +203,35 @@ def test_regression_10_full_user_invoice_pipeline():
     # 6. Overall verification should have ZERO critical failures
     assert verif["criticalFailuresCount"] == 0
     assert verif["allPassed"] is True
+
+
+def test_regression_11_healing_raw_unhealed_format():
+    """Test 11: Even if raw OCR previously passed concatenated quantities (e.g. 'Office chairs 2' with 1500/3000
+    and 'Printer toner 1' with 2000/2000), self-healing must correctly normalize them and PASS.
+    """
+    raw_items = [
+        {"description": "Office chairs 2", "quantity": 1500.0, "unitPrice": 3000.0, "lineTotal": 3000.0},
+        {"description": "Printer toner 1", "quantity": 2000.0, "unitPrice": 2000.0, "lineTotal": 2000.0},
+    ]
+    res = verify_line_items_math(raw_items)
+    assert res["status"] == STATUS_PASSED
+    assert res["passed"] is True
+    assert res["severity"] == "INFO"
+    assert len(res["details"]) == 2
+
+    # Check Office chairs
+    d1 = res["details"][0]
+    assert d1["status"] == STATUS_PASSED
+    assert d1["quantity"] == 2.0
+    assert d1["unit_price"] == 1500.0
+    assert d1["line_total"] == 3000.0
+    assert d1["expected_total"] == 3000.0
+
+    # Check Printer toner
+    d2 = res["details"][1]
+    assert d2["status"] == STATUS_PASSED
+    assert d2["quantity"] == 1.0
+    assert d2["unit_price"] == 2000.0
+    assert d2["line_total"] == 2000.0
+    assert d2["expected_total"] == 2000.0
+

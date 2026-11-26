@@ -46,12 +46,37 @@ def render_verify(user: dict):
 
     fields = doc.get("fields", {})
     confidences = doc.get("fieldConfidence", {})
-    risk = doc.get("risk", {})
-    verif = doc.get("verification", {})
+    line_items = doc.get("lineItems", [])
     ml = doc.get("ml", {})
     cv = doc.get("cv", {})
     file_info = doc.get("file", {})
     review = doc.get("review") or {}
+
+    # Live evaluation of verification invariants with current engine:
+    live_verif = verification.run_verification_rules(fields, line_items)
+    stored_verif = doc.get("verification", {})
+    stored_risk = doc.get("risk", {})
+
+    if (
+        not stored_verif
+        or live_verif.get("criticalFailuresCount") != stored_verif.get("criticalFailuresCount")
+        or live_verif.get("allPassed") != stored_verif.get("allPassed")
+        or any(r.get("status") is None for r in stored_verif.get("ruleResults", []))
+    ):
+        verif = live_verif
+        risk = risk_assessment.compute_document_risk(
+            verification_results=verif,
+            duplicate_results={"hasDuplicate": False, "duplicateMatches": stored_verif.get("duplicateMatches", [])},
+            cv_results=cv,
+            ml_results=ml,
+        )
+        try:
+            firebase_service.update_document(chosen_id, {"verification": verif, "risk": risk})
+        except Exception:
+            pass
+    else:
+        verif = live_verif
+        risk = stored_risk
 
     # 1. Top Executive Status Bar
     st.markdown("<div style='margin-top: 8px; margin-bottom: 16px;'>", unsafe_allow_html=True)

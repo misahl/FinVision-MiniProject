@@ -2,6 +2,7 @@
 
 from typing import Any, Dict, List, Optional
 import streamlit as st
+from src.verification import RULE_METADATA
 
 
 def render_topbar(user: Dict[str, Any], active_section: str = "Ingest & Verify"):
@@ -133,7 +134,13 @@ def render_rule_card(rule: Dict[str, Any]):
     passed = rule.get("passed", True)
     severity = rule.get("severity", "INFO")
     rule_id = rule.get("rule_id", "RULE")
-    display_name = rule.get("display_name") or rule_id
+    meta = RULE_METADATA.get(rule_id, {})
+    display_name = rule.get("display_name") or meta.get("display_name") or rule_id
+    id_badge = (
+        f'<span style="font-family: monospace; font-size: 0.72rem; color: #86868B; background: rgba(0,0,0,0.04); padding: 2px 6px; border-radius: 4px;">{rule_id}</span>'
+        if display_name != rule_id
+        else ""
+    )
     message = rule.get("message", "")
     raw_status = rule.get("status")
 
@@ -220,7 +227,7 @@ def render_rule_card(rule: Dict[str, Any]):
             <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; flex-wrap: wrap; gap: 4px;">
                 <div style="display: flex; align-items: baseline; gap: 8px;">
                     <span style="font-weight: 700; font-size: 0.92rem; color: #1D1D1F;">{display_name}</span>
-                    <span style="font-family: monospace; font-size: 0.72rem; color: #86868B; background: rgba(0,0,0,0.04); padding: 2px 6px; border-radius: 4px;">{rule_id}</span>
+                    {id_badge}
                 </div>
                 <span style="font-weight: 700; font-size: 0.8rem; color: {status_color};">{icon} {status_text}</span>
             </div>

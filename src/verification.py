@@ -202,12 +202,20 @@ def verify_line_items_math(line_items: List[Dict[str, Any]]) -> Dict[str, Any]:
         if qty > unit_price and unit_price <= Decimal("100") and unit_price % 1 == 0 and abs((qty * unit_price) - line_total) <= TOLERANCE:
             qty, unit_price = unit_price, qty
 
-        # Case B: Price was populated with Total and Qty was populated with Price (e.g. qty=1500, price=3000, total=3000, desc='Office chairs 2')
-        if unit_price == line_total and qty > 0 and line_total > qty and (line_total % qty) == Decimal(0):
+        # Case B: Ratio healing when unit_price == line_total or qty was mapped to price (e.g. qty=1500, price=3000, total=3000, desc='Office chairs 2')
+        if unit_price == line_total and qty > 0 and (line_total % qty) == Decimal(0):
             ratio = line_total / qty
             trailing_m = re.search(r"\b(\d+)\b\s*$", desc)
             if trailing_m and Decimal(trailing_m.group(1)) == ratio:
                 desc = re.sub(r"\b\d+\b\s*$", "", desc).strip()
+                unit_price = qty
+                qty = ratio
+            elif ratio == Decimal(1):
+                if trailing_m:
+                    desc = re.sub(r"\b\d+\b\s*$", "", desc).strip()
+                unit_price = qty
+                qty = Decimal(1)
+            elif qty > 1 and (qty * unit_price) != line_total:
                 unit_price = qty
                 qty = ratio
 
