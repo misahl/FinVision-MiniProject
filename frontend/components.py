@@ -129,21 +129,28 @@ def render_risk_badge(level: str, score: float = 0.0) -> str:
 
 
 def render_rule_card(rule: Dict[str, Any]):
-    """Render an individual rule outcome block."""
+    """Render an individual rule outcome block with friendly names, 4 statuses, and breakdown tables."""
     passed = rule.get("passed", True)
     severity = rule.get("severity", "INFO")
     rule_id = rule.get("rule_id", "RULE")
+    display_name = rule.get("display_name") or rule_id
     message = rule.get("message", "")
+    raw_status = rule.get("status")
 
-    if passed:
+    if raw_status == "NOT CHECKED":
+        card_class = "rule-item-not-checked"
+        icon = "⚪"
+        status_text = "NOT CHECKED"
+        status_color = "#64748B"
+    elif raw_status == "PASSED" or (raw_status is None and passed):
         card_class = "rule-item-pass"
         icon = "✓"
         status_text = "PASSED"
         status_color = "#16A34A"
-    elif severity == "CRITICAL":
+    elif raw_status == "FAILED" or (raw_status is None and not passed and severity == "CRITICAL"):
         card_class = "rule-item-fail"
         icon = "✕"
-        status_text = "FAILED (CRITICAL)"
+        status_text = "FAILED (CRITICAL)" if severity == "CRITICAL" else "FAILED"
         status_color = "#DC2626"
     else:
         card_class = "rule-item-warn"
@@ -151,14 +158,74 @@ def render_rule_card(rule: Dict[str, Any]):
         status_text = "WARNING"
         status_color = "#D97706"
 
+    # Build line item / breakdown table if details are available
+    details = rule.get("details", [])
+    details_html = ""
+    if details and isinstance(details, list):
+        rows_html = []
+        for d in details:
+            d_desc = d.get("description", "Item")
+            d_qty = f"{d['quantity']:g}" if d.get("quantity") is not None else "-"
+            d_price = f"{d['unit_price']:,.2f}" if d.get("unit_price") is not None else "-"
+            d_exp = f"{d['expected_total']:,.2f}" if d.get("expected_total") is not None else "-"
+            d_act = f"{d['line_total']:,.2f}" if d.get("line_total") is not None else "-"
+            d_diff = f"{d['difference']:,.2f}" if d.get("difference") is not None else "-"
+            d_stat = d.get("status", "NOT CHECKED")
+
+            if d_stat == "PASSED":
+                stat_badge = '<span style="color: #16A34A; font-weight: 700;">✓ PASSED</span>'
+            elif d_stat == "FAILED":
+                stat_badge = '<span style="color: #DC2626; font-weight: 700;">✕ FAILED</span>'
+            elif d_stat == "WARNING":
+                stat_badge = '<span style="color: #D97706; font-weight: 700;">⚠ WARNING</span>'
+            else:
+                stat_badge = '<span style="color: #64748B; font-weight: 600;">⚪ NOT CHECKED</span>'
+
+            row = (
+                f'<tr style="border-bottom: 1px solid rgba(0,0,0,0.05);">'
+                f'<td style="padding: 6px 8px; font-weight: 600; color: #1D1D1F;">{d_desc}</td>'
+                f'<td style="padding: 6px 8px; text-align: right; color: #374151;">{d_qty}</td>'
+                f'<td style="padding: 6px 8px; text-align: right; color: #374151;">{d_price}</td>'
+                f'<td style="padding: 6px 8px; text-align: right; color: #16A34A; font-weight: 600;">{d_exp}</td>'
+                f'<td style="padding: 6px 8px; text-align: right; color: #1D1D1F; font-weight: 600;">{d_act}</td>'
+                f'<td style="padding: 6px 8px; text-align: right; color: #6E6E73;">{d_diff}</td>'
+                f'<td style="padding: 6px 8px; text-align: center;">{stat_badge}</td>'
+                f'</tr>'
+            )
+            rows_html.append(row)
+
+        details_html = (
+            f'<div style="margin-top: 10px; padding-top: 8px; border-top: 1px solid rgba(0,0,0,0.08); overflow-x: auto;">'
+            f'<div style="font-size: 0.76rem; font-weight: 700; color: #6E6E73; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.04em;">Itemized Calculation Breakdown (Qty × Unit Price = Stated Total)</div>'
+            f'<table style="width: 100%; border-collapse: collapse; font-size: 0.8rem; background: rgba(255,255,255,0.6); border-radius: 6px;">'
+            f'<thead>'
+            f'<tr style="background: rgba(0,0,0,0.03); color: #6E6E73; border-bottom: 1px solid rgba(0,0,0,0.08); font-size: 0.74rem;">'
+            f'<th style="padding: 6px 8px; text-align: left;">Item Description</th>'
+            f'<th style="padding: 6px 8px; text-align: right;">Quantity</th>'
+            f'<th style="padding: 6px 8px; text-align: right;">Unit Price</th>'
+            f'<th style="padding: 6px 8px; text-align: right;">Expected</th>'
+            f'<th style="padding: 6px 8px; text-align: right;">Stated</th>'
+            f'<th style="padding: 6px 8px; text-align: right;">Diff</th>'
+            f'<th style="padding: 6px 8px; text-align: center;">Status</th>'
+            f'</tr>'
+            f'</thead>'
+            f'<tbody>{"".join(rows_html)}</tbody>'
+            f'</table>'
+            f'</div>'
+        )
+
     st.markdown(
         f"""
         <div class="{card_class}">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
-                <span style="font-weight: 700; font-size: 0.88rem; color: #1D1D1F;">{rule_id}</span>
+            <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; flex-wrap: wrap; gap: 4px;">
+                <div style="display: flex; align-items: baseline; gap: 8px;">
+                    <span style="font-weight: 700; font-size: 0.92rem; color: #1D1D1F;">{display_name}</span>
+                    <span style="font-family: monospace; font-size: 0.72rem; color: #86868B; background: rgba(0,0,0,0.04); padding: 2px 6px; border-radius: 4px;">{rule_id}</span>
+                </div>
                 <span style="font-weight: 700; font-size: 0.8rem; color: {status_color};">{icon} {status_text}</span>
             </div>
-            <div style="font-size: 0.84rem; color: #424245; line-height: 1.4;">{message}</div>
+            <div style="font-size: 0.84rem; color: #424245; line-height: 1.45;">{message}</div>
+            {details_html}
         </div>
         """,
         unsafe_allow_html=True,

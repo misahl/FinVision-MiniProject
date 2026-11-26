@@ -644,16 +644,25 @@ def extract_invoice_fields(
                     pass
 
     # 5. Line Items Heuristic:
-    # Scan table lines between 'ITEMS' / 'Description' and 'SUMMARY' / 'Total'
+    # Scan table lines between headers ('ITEMS' / 'Description' / 'Qty' / 'Particulars')
+    # and summary/totals ('Subtotal' / 'Grand Total' / 'Tax' / 'Summary')
     in_items_section = False
     for line in lines:
         line_txt = " ".join(w["text"] for w in line)
-        if "items" in line_txt.lower() or "description" in line_txt.lower():
-            in_items_section = True
-            continue
-        if in_items_section and any(k in line_txt.lower() for k in ["summary", "total", "subtotal", "vat ["]):
-            in_items_section = False
-            break
+        lower_txt = line_txt.lower()
+
+        if not in_items_section:
+            if any(k in lower_txt for k in ["item", "description", "particular", "product", "service"]) or \
+               ("qty" in lower_txt and any(p in lower_txt for p in ["price", "rate", "total", "amount"])):
+                in_items_section = True
+                continue
+        else:
+            if any(k in lower_txt for k in ["subtotal", "sub-total", "grand total", "total amount", "tax amount", "balance due", "amount due"]):
+                in_items_section = False
+                break
+            if re.match(r"^(total|tax|vat|discount|summary)\b", lower_txt.strip()):
+                in_items_section = False
+                break
 
         if in_items_section:
             # Multi-token line item extraction with mathematical solver:
@@ -667,28 +676,42 @@ def extract_invoice_fields(
             qty = None
             unit_price = None
             line_total = None
+            desc_start_idx = 0
             desc_end_idx = len(words_in_line)
 
             if len(tokens) >= 3:
                 t_val = tokens[-1][1]
                 p_val = tokens[-2][1]
                 q_val = tokens[-3][1]
+
                 # Check if last token is product of preceding two: qty * unit_price == line_total
                 if abs((q_val * p_val) - t_val) <= Decimal("0.05"):
                     qty = q_val
                     unit_price = p_val
                     line_total = t_val
-                    desc_end_idx = tokens[-3][0]
+                    if tokens[-3][0] == 0:
+                        desc_start_idx = 1
+                        desc_end_idx = tokens[-2][0]
+                    else:
+                        desc_end_idx = tokens[-3][0]
                 elif abs((p_val * q_val) - t_val) <= Decimal("0.05"):
                     qty = p_val
                     unit_price = q_val
                     line_total = t_val
-                    desc_end_idx = tokens[-3][0]
+                    if tokens[-3][0] == 0:
+                        desc_start_idx = 1
+                        desc_end_idx = tokens[-2][0]
+                    else:
+                        desc_end_idx = tokens[-3][0]
                 else:
                     qty = q_val
                     unit_price = p_val
                     line_total = t_val
-                    desc_end_idx = tokens[-3][0]
+                    if tokens[-3][0] == 0:
+                        desc_start_idx = 1
+                        desc_end_idx = tokens[-2][0]
+                    else:
+                        desc_end_idx = tokens[-3][0]
             elif len(tokens) == 2:
                 val1 = tokens[0][1]
                 val2 = tokens[1][1]
@@ -707,9 +730,12 @@ def extract_invoice_fields(
                 desc_end_idx = tokens[0][0]
 
             if qty is not None and line_total is not None:
-                desc = " ".join(words_in_line[:desc_end_idx])
+                desc = " ".join(words_in_line[desc_start_idx:desc_end_idx])
                 desc = re.sub(r"[$€£₹]|USD|EUR|INR|CAD|AUD", "", desc)
                 desc = re.sub(r"\b(each|pc|pcs|hours|hrs|items)\b", "", desc, flags=re.IGNORECASE).strip()
+                # Clean any trailing number that matches qty (e.g. 'Office chairs 2')
+                if qty % 1 == 0:
+                    desc = re.sub(rf"\s+{re.escape(str(int(qty)))}\b", "", desc).strip()
                 if len(desc) >= 2:
                     inv.line_items.append(
                         LineItem(

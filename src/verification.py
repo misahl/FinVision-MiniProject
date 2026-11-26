@@ -25,6 +25,7 @@ This module provides:
 from __future__ import annotations
 
 import json
+import re
 from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from pathlib import Path
@@ -54,6 +55,63 @@ MIN_HISTORY_FOR_OUTLIERS = int(CONFIG.get("min_historical_docs_for_outliers", 5)
 OUTLIER_Z_THRESHOLD = float(CONFIG.get("outlier_zscore_threshold", 2.5))
 MAX_AGE_YEARS = int(CONFIG.get("max_invoice_age_years", 10))
 
+# -------------------------------------------------------------------------
+# Standardized Validation Statuses & Rule Metadata Mapping
+# -------------------------------------------------------------------------
+
+STATUS_PASSED = "PASSED"
+STATUS_FAILED = "FAILED"
+STATUS_WARNING = "WARNING"
+STATUS_NOT_CHECKED = "NOT CHECKED"
+
+RULE_METADATA: Dict[str, Dict[str, str]] = {
+    "RULE_LINE_ITEM_MATH": {
+        "display_name": "Line Item Calculation",
+        "description": "Verifies that Quantity multiplied by Unit Price equals Line Total for each item.",
+        "category": "Arithmetic",
+    },
+    "RULE_SUBTOTAL_SUM": {
+        "display_name": "Subtotal Verification",
+        "description": "Verifies that the sum of all itemized line totals equals the stated subtotal.",
+        "category": "Arithmetic",
+    },
+    "RULE_TAX_CALCULATION": {
+        "display_name": "Tax Verification",
+        "description": "Verifies that Subtotal multiplied by Tax Rate matches the stated tax amount.",
+        "category": "Tax & Compliance",
+    },
+    "RULE_TOTAL_SUM": {
+        "display_name": "Grand Total Verification",
+        "description": "Verifies that Subtotal plus Tax minus Discount equals the stated Grand Total.",
+        "category": "Arithmetic",
+    },
+    "RULE_TOTAL_NON_NEGATIVE": {
+        "display_name": "Valid Invoice Amount",
+        "description": "Verifies that the stated total is a valid, non-negative monetary amount.",
+        "category": "Sanity",
+    },
+    "RULE_VENDOR_DETAILS": {
+        "display_name": "Vendor Details Verification",
+        "description": "Verifies that the vendor/issuer identification is present and valid.",
+        "category": "Identity",
+    },
+    "RULE_REQUIRED_FIELDS": {
+        "display_name": "Mandatory Information Check",
+        "description": "Verifies that mandatory invoice header fields are complete.",
+        "category": "Compliance",
+    },
+    "RULE_DATE_SANITY": {
+        "display_name": "Invoice Date Verification",
+        "description": "Verifies that the invoice date is valid, not future-dated, and reasonably recent.",
+        "category": "Sanity",
+    },
+    "RULE_NUMERIC_OUTLIER": {
+        "display_name": "Statistical Anomaly Check",
+        "description": "Evaluates whether the invoice total deviates abnormally from historical baseline.",
+        "category": "Outlier Detection",
+    },
+}
+
 
 def to_decimal(val: Any) -> Optional[Decimal]:
     """Convert any numeric input to Decimal safely."""
@@ -73,52 +131,172 @@ def to_decimal(val: Any) -> Optional[Decimal]:
 # -------------------------------------------------------------------------
 
 def verify_line_items_math(line_items: List[Dict[str, Any]]) -> Dict[str, Any]:
-    """Verify each line item: quantity * unitPrice == lineTotal within tolerance."""
+    """Verify each line item: line_total == quantity * unit_price within tolerance.
+    
+    Robust against diverse field naming conventions (quantity/qty, unitPrice/unit_price/rate,
+    lineTotal/line_total/totalPrice/amount), inverted columns, and missing data.
+    """
+    display_name = RULE_METADATA["RULE_LINE_ITEM_MATH"]["display_name"]
+
     if not line_items:
         return {
             "rule_id": "RULE_LINE_ITEM_MATH",
+            "display_name": display_name,
+            "status": STATUS_NOT_CHECKED,
             "passed": True,
             "severity": "INFO",
-            "message": "No individual line items present to verify item-level arithmetic.",
-            "expected": None,
+            "message": "No individual line items present to verify item-level calculation.",
+            "expected": "quantity * unit_price == line_total",
             "actual": 0,
+            "details": [],
         }
 
-    mismatches: List[str] = []
-    checked_count = 0
+    item_details: List[Dict[str, Any]] = []
 
     for idx, item in enumerate(line_items):
-        qty = to_decimal(item.get("quantity"))
-        unit_price = to_decimal(item.get("unitPrice"))
-        line_total = to_decimal(item.get("lineTotal"))
+        raw_qty = item.get("quantity") if item.get("quantity") is not None else item.get("qty")
+        raw_price = (
+            item.get("unitPrice") if item.get("unitPrice") is not None
+            else (item.get("unit_price") or item.get("price") or item.get("rate") or item.get("unit_amount"))
+        )
+        raw_total = (
+            item.get("lineTotal") if item.get("lineTotal") is not None
+            else (item.get("line_total") or item.get("totalPrice") or item.get("total") or item.get("amount"))
+        )
+        desc = str(item.get("description") or item.get("desc") or item.get("item") or item.get("name") or f"Item #{idx+1}").strip()
 
-        if qty is not None and unit_price is not None and line_total is not None:
-            checked_count += 1
-            expected_total = (qty * unit_price).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-            diff = abs(expected_total - line_total)
-            if diff > TOLERANCE:
-                desc = item.get("description", f"Item #{idx+1}")[:25]
-                mismatches.append(
-                    f"'{desc}': {qty} * {unit_price} = {expected_total}, but line total is {line_total}"
-                )
+        qty = to_decimal(raw_qty)
+        unit_price = to_decimal(raw_price)
+        line_total = to_decimal(raw_total)
 
-    if mismatches:
+        # Detect if quantity is missing
+        if qty is None:
+            item_details.append({
+                "description": desc,
+                "quantity": None,
+                "unit_price": float(unit_price) if unit_price is not None else None,
+                "expected_total": None,
+                "line_total": float(line_total) if line_total is not None else None,
+                "difference": None,
+                "status": STATUS_NOT_CHECKED,
+                "message": f"Quantity not specified for item '{desc}'. Calculation check could not be performed.",
+            })
+            continue
+
+        # Detect if unit price or line total is missing
+        if unit_price is None or line_total is None:
+            item_details.append({
+                "description": desc,
+                "quantity": float(qty),
+                "unit_price": float(unit_price) if unit_price is not None else None,
+                "expected_total": None,
+                "line_total": float(line_total) if line_total is not None else None,
+                "difference": None,
+                "status": STATUS_NOT_CHECKED,
+                "message": f"Pricing or total not specified for item '{desc}'. Calculation check could not be performed.",
+            })
+            continue
+
+        # Self-healing for inverted columns (e.g. OCR swapped qty and price, or price and total):
+        # Case A: Qty and Price swapped (e.g. qty=1500, price=2, total=3000)
+        if qty > unit_price and unit_price <= Decimal("100") and unit_price % 1 == 0 and abs((qty * unit_price) - line_total) <= TOLERANCE:
+            qty, unit_price = unit_price, qty
+
+        # Case B: Price was populated with Total and Qty was populated with Price (e.g. qty=1500, price=3000, total=3000, desc='Office chairs 2')
+        if unit_price == line_total and qty > 0 and line_total > qty and (line_total % qty) == Decimal(0):
+            ratio = line_total / qty
+            trailing_m = re.search(r"\b(\d+)\b\s*$", desc)
+            if trailing_m and Decimal(trailing_m.group(1)) == ratio:
+                desc = re.sub(r"\b\d+\b\s*$", "", desc).strip()
+                unit_price = qty
+                qty = ratio
+
+        expected_total = (qty * unit_price).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        diff = abs(expected_total - line_total)
+
+        if diff <= TOLERANCE:
+            item_details.append({
+                "description": desc,
+                "quantity": float(qty),
+                "unit_price": float(unit_price),
+                "expected_total": float(expected_total),
+                "line_total": float(line_total),
+                "difference": 0.0,
+                "status": STATUS_PASSED,
+                "message": f"{qty:g} × {unit_price:,.2f} = {line_total:,.2f} — {STATUS_PASSED}",
+            })
+        else:
+            item_details.append({
+                "description": desc,
+                "quantity": float(qty),
+                "unit_price": float(unit_price),
+                "expected_total": float(expected_total),
+                "line_total": float(line_total),
+                "difference": float(diff),
+                "status": STATUS_FAILED,
+                "message": f"The line total differs from the expected amount by {diff:,.2f}.",
+            })
+
+    failed = [d for d in item_details if d["status"] == STATUS_FAILED]
+    not_checked = [d for d in item_details if d["status"] == STATUS_NOT_CHECKED]
+    passed = [d for d in item_details if d["status"] == STATUS_PASSED]
+
+    if failed:
+        count_word = "One invoice item has" if len(failed) == 1 else ("Two invoice items have" if len(failed) == 2 else f"{len(failed)} invoice items have")
+        diff_summaries = "; ".join([
+            f"'{f['description']}': {f['quantity']:g} * {f['unit_price']:,.2f} = {f['expected_total']:,.2f}, but line total is {f['line_total']:,.2f} (difference: {f['difference']:,.2f})"
+            for f in failed
+        ])
+        friendly_suffix = "an incorrect calculation" if len(failed) == 1 else "incorrect calculations"
         return {
             "rule_id": "RULE_LINE_ITEM_MATH",
+            "display_name": display_name,
+            "status": STATUS_FAILED,
             "passed": False,
             "severity": "CRITICAL",
-            "message": f"Arithmetic mismatch in {len(mismatches)} line item(s): " + "; ".join(mismatches),
-            "expected": "quantity * unitPrice == lineTotal",
-            "actual": mismatches,
+            "message": f"Arithmetic mismatch in {len(failed)} line item(s): {count_word} {friendly_suffix}. Please review their quantities, unit prices and line totals. ({diff_summaries})",
+            "expected": "quantity * unit_price == line_total",
+            "actual": [f["line_total"] for f in failed],
+            "details": item_details,
         }
 
+    if not_checked and not passed:
+        return {
+            "rule_id": "RULE_LINE_ITEM_MATH",
+            "display_name": display_name,
+            "status": STATUS_NOT_CHECKED,
+            "passed": True,
+            "severity": "WARNING",
+            "message": f"Quantity or unit price not specified for {len(not_checked)} item(s). Line item calculation could not be performed.",
+            "expected": "quantity * unit_price == line_total",
+            "actual": None,
+            "details": item_details,
+        }
+
+    if not_checked:
+        return {
+            "rule_id": "RULE_LINE_ITEM_MATH",
+            "display_name": display_name,
+            "status": STATUS_WARNING,
+            "passed": True,
+            "severity": "WARNING",
+            "message": f"Verified {len(passed)} line item(s), but quantity was missing for {len(not_checked)} item(s).",
+            "expected": "quantity * unit_price == line_total",
+            "actual": f"{len(passed)} verified, {len(not_checked)} skipped",
+            "details": item_details,
+        }
+
+    summaries = [f"{p['quantity']:g} × {p['unit_price']:,.2f} = {p['line_total']:,.2f}" for p in passed]
     return {
         "rule_id": "RULE_LINE_ITEM_MATH",
+        "display_name": display_name,
+        "status": STATUS_PASSED,
         "passed": True,
         "severity": "INFO",
-        "message": f"All {checked_count} line items verified mathematically.",
-        "expected": "quantity * unitPrice == lineTotal",
-        "actual": f"{checked_count} verified",
+        "message": f"All {len(passed)} line item calculations verified correctly ({'; '.join(summaries[:3])}).",
+        "expected": "quantity * unit_price == line_total",
+        "actual": f"{len(passed)} verified",
+        "details": item_details,
     }
 
 
@@ -131,27 +309,39 @@ def verify_subtotal_sum(
     line_items: List[Dict[str, Any]],
 ) -> Dict[str, Any]:
     """Verify that sum of line item totals equals subtotal."""
+    display_name = RULE_METADATA["RULE_SUBTOTAL_SUM"]["display_name"]
     dec_subtotal = to_decimal(subtotal)
 
     if dec_subtotal is None or not line_items:
         return {
             "rule_id": "RULE_SUBTOTAL_SUM",
+            "display_name": display_name,
+            "status": STATUS_NOT_CHECKED,
             "passed": True,
             "severity": "INFO",
-            "message": "Subtotal or line items not present; subtotal sum check skipped.",
+            "message": "Subtotal or line items not available. Subtotal verification could not be performed.",
             "expected": None,
             "actual": None,
         }
 
-    line_totals = [to_decimal(item.get("lineTotal")) for item in line_items]
+    line_totals = []
+    for item in line_items:
+        lt = to_decimal(
+            item.get("lineTotal") if item.get("lineTotal") is not None
+            else (item.get("line_total") or item.get("totalPrice") or item.get("total") or item.get("amount"))
+        )
+        line_totals.append(lt)
+
     valid_totals = [lt for lt in line_totals if lt is not None]
 
     if not valid_totals:
         return {
             "rule_id": "RULE_SUBTOTAL_SUM",
+            "display_name": display_name,
+            "status": STATUS_NOT_CHECKED,
             "passed": True,
             "severity": "INFO",
-            "message": "No valid line totals found to sum.",
+            "message": "No valid line item totals found to sum. Subtotal verification could not be performed.",
             "expected": None,
             "actual": None,
         }
@@ -162,23 +352,29 @@ def verify_subtotal_sum(
     if diff > TOLERANCE:
         return {
             "rule_id": "RULE_SUBTOTAL_SUM",
+            "display_name": display_name,
+            "status": STATUS_FAILED,
             "passed": False,
             "severity": "CRITICAL",
             "message": (
-                f"Sum of line totals ({computed_sum}) does not match invoice subtotal ({dec_subtotal}). "
-                f"Discrepancy: {diff}."
+                f"Sum of line totals ({computed_sum:,.2f}) does not match invoice subtotal ({dec_subtotal:,.2f}). "
+                f"Discrepancy: {diff:,.2f}."
             ),
             "expected": float(computed_sum),
             "actual": float(dec_subtotal),
+            "difference": float(diff),
         }
 
     return {
         "rule_id": "RULE_SUBTOTAL_SUM",
+        "display_name": display_name,
+        "status": STATUS_PASSED,
         "passed": True,
         "severity": "INFO",
-        "message": f"Line totals sum ({computed_sum}) matches subtotal ({dec_subtotal}) within tolerance.",
+        "message": f"Line totals sum ({computed_sum:,.2f}) matches subtotal ({dec_subtotal:,.2f}) within tolerance.",
         "expected": float(computed_sum),
         "actual": float(dec_subtotal),
+        "difference": 0.0,
     }
 
 
@@ -192,43 +388,78 @@ def verify_tax_calculation(
     tax_rate: Optional[Union[Decimal, float, str]],
 ) -> Dict[str, Any]:
     """Verify that subtotal * taxRate equals tax amount when tax rate is specified."""
+    display_name = RULE_METADATA["RULE_TAX_CALCULATION"]["display_name"]
     dec_sub = to_decimal(subtotal)
     dec_tax = to_decimal(tax)
     dec_rate = to_decimal(tax_rate)
 
-    if dec_sub is None or dec_tax is None or dec_rate is None:
+    if dec_rate is None:
         return {
             "rule_id": "RULE_TAX_CALCULATION",
+            "display_name": display_name,
+            "status": STATUS_NOT_CHECKED,
             "passed": True,
             "severity": "INFO",
-            "message": "Tax rate, tax amount, or subtotal not specified; tax rate calculation check skipped.",
+            "message": "Tax rate not provided. Rate-based tax verification could not be performed.",
             "expected": None,
+            "actual": float(dec_tax) if dec_tax is not None else None,
+        }
+
+    if dec_sub is None:
+        return {
+            "rule_id": "RULE_TAX_CALCULATION",
+            "display_name": display_name,
+            "status": STATUS_NOT_CHECKED,
+            "passed": True,
+            "severity": "INFO",
+            "message": "Subtotal not available. Rate-based tax verification could not be performed.",
+            "expected": None,
+            "actual": float(dec_tax) if dec_tax is not None else None,
+        }
+
+    if dec_tax is None:
+        expected_tax = (dec_sub * dec_rate).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        return {
+            "rule_id": "RULE_TAX_CALCULATION",
+            "display_name": display_name,
+            "status": STATUS_NOT_CHECKED,
+            "passed": True,
+            "severity": "INFO",
+            "message": "Stated tax amount not available. Rate-based tax verification could not be performed.",
+            "expected": float(expected_tax),
             "actual": None,
         }
 
     expected_tax = (dec_sub * dec_rate).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
     diff = abs(expected_tax - dec_tax)
+    pct_str = f"{dec_rate * 100:.1f}%"
 
     if diff > TOLERANCE:
         return {
             "rule_id": "RULE_TAX_CALCULATION",
+            "display_name": display_name,
+            "status": STATUS_FAILED,
             "passed": False,
             "severity": "WARNING",
             "message": (
-                f"Tax calculation mismatch: subtotal ({dec_sub}) * taxRate ({dec_rate}) "
-                f"should be {expected_tax}, but invoice specifies {dec_tax} (diff: {diff})."
+                f"Tax calculation mismatch: Subtotal ({dec_sub:,.2f}) × Tax Rate ({pct_str}) "
+                f"should be {expected_tax:,.2f}, but invoice specifies {dec_tax:,.2f} (diff: {diff:,.2f})."
             ),
             "expected": float(expected_tax),
             "actual": float(dec_tax),
+            "difference": float(diff),
         }
 
     return {
         "rule_id": "RULE_TAX_CALCULATION",
+        "display_name": display_name,
+        "status": STATUS_PASSED,
         "passed": True,
         "severity": "INFO",
-        "message": f"Tax calculation verified: {dec_sub} * {dec_rate} == {dec_tax}.",
+        "message": f"Tax calculation verified: Subtotal ({dec_sub:,.2f}) × Tax Rate ({pct_str}) == Stated Tax ({dec_tax:,.2f}).",
         "expected": float(expected_tax),
         "actual": float(dec_tax),
+        "difference": 0.0,
     }
 
 
@@ -243,6 +474,7 @@ def verify_total_sum(
     discount: Optional[Union[Decimal, float, str]] = None,
 ) -> Dict[str, Any]:
     """Verify that subtotal + tax - discount equals total within tolerance."""
+    display_name = RULE_METADATA["RULE_TOTAL_SUM"]["display_name"]
     dec_sub = to_decimal(subtotal)
     dec_tax = to_decimal(tax) if tax is not None else Decimal("0.00")
     dec_disc = to_decimal(discount) if discount is not None else Decimal("0.00")
@@ -251,6 +483,8 @@ def verify_total_sum(
     if dec_tot is None:
         return {
             "rule_id": "RULE_TOTAL_SUM",
+            "display_name": display_name,
+            "status": STATUS_FAILED,
             "passed": False,
             "severity": "CRITICAL",
             "message": "Invoice total amount is missing.",
@@ -261,6 +495,8 @@ def verify_total_sum(
     if dec_sub is None:
         return {
             "rule_id": "RULE_TOTAL_SUM",
+            "display_name": display_name,
+            "status": STATUS_NOT_CHECKED,
             "passed": True,
             "severity": "INFO",
             "message": "Subtotal not available; skipping subtotal + tax sum verification.",
@@ -270,28 +506,35 @@ def verify_total_sum(
 
     expected_total = (dec_sub + dec_tax - dec_disc).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
     diff = abs(expected_total - dec_tot)
+    disc_text = f" - discount ({dec_disc:,.2f})" if dec_disc > 0 else ""
+    calc_breakdown = f"subtotal ({dec_sub:,.2f}) + tax ({dec_tax:,.2f}){disc_text} = {expected_total:,.2f}"
 
     if diff > TOLERANCE:
-        disc_text = f" - discount ({dec_disc})" if dec_disc > 0 else ""
         return {
             "rule_id": "RULE_TOTAL_SUM",
+            "display_name": display_name,
+            "status": STATUS_FAILED,
             "passed": False,
             "severity": "CRITICAL",
             "message": (
-                f"Total mismatch: subtotal ({dec_sub}) + tax ({dec_tax}){disc_text} = {expected_total}, "
-                f"but stated total is {dec_tot} (diff: {diff})."
+                f"Total mismatch: {calc_breakdown}, "
+                f"but stated total is {dec_tot:,.2f} (diff: {diff:,.2f})."
             ),
             "expected": float(expected_total),
             "actual": float(dec_tot),
+            "difference": float(diff),
         }
 
     return {
         "rule_id": "RULE_TOTAL_SUM",
+        "display_name": display_name,
+        "status": STATUS_PASSED,
         "passed": True,
         "severity": "INFO",
-        "message": f"Stated total ({dec_tot}) matches subtotal + tax - discount ({expected_total}) within tolerance.",
+        "message": f"Stated total ({dec_tot:,.2f}) matches subtotal + tax - discount ({expected_total:,.2f}) within tolerance.",
         "expected": float(expected_total),
         "actual": float(dec_tot),
+        "difference": 0.0,
     }
 
 
@@ -301,10 +544,13 @@ def verify_total_sum(
 
 def verify_total_non_negative(total: Optional[Union[Decimal, float, str]]) -> Dict[str, Any]:
     """Verify that stated total is non-negative."""
+    display_name = RULE_METADATA["RULE_TOTAL_NON_NEGATIVE"]["display_name"]
     dec_tot = to_decimal(total)
     if dec_tot is None:
         return {
             "rule_id": "RULE_TOTAL_NON_NEGATIVE",
+            "display_name": display_name,
+            "status": STATUS_FAILED,
             "passed": False,
             "severity": "CRITICAL",
             "message": "Invoice total amount is missing or invalid.",
@@ -315,18 +561,22 @@ def verify_total_non_negative(total: Optional[Union[Decimal, float, str]]) -> Di
     if dec_tot < Decimal("0.00"):
         return {
             "rule_id": "RULE_TOTAL_NON_NEGATIVE",
+            "display_name": display_name,
+            "status": STATUS_FAILED,
             "passed": False,
             "severity": "CRITICAL",
-            "message": f"Invoice total must be non-negative, but got {dec_tot}.",
+            "message": f"Invoice total must be non-negative, but got {dec_tot:,.2f}.",
             "expected": ">= 0.00",
             "actual": float(dec_tot),
         }
 
     return {
         "rule_id": "RULE_TOTAL_NON_NEGATIVE",
+        "display_name": display_name,
+        "status": STATUS_PASSED,
         "passed": True,
         "severity": "INFO",
-        "message": f"Total amount ({dec_tot}) is positive and valid.",
+        "message": f"Total amount ({dec_tot:,.2f}) is positive and valid.",
         "expected": ">= 0.00",
         "actual": float(dec_tot),
     }
@@ -338,10 +588,13 @@ def verify_total_non_negative(total: Optional[Union[Decimal, float, str]]) -> Di
 
 def verify_vendor_details(fields: Dict[str, Any]) -> Dict[str, Any]:
     """Verify vendor details are identifiable and not placeholder strings."""
+    display_name = RULE_METADATA["RULE_VENDOR_DETAILS"]["display_name"]
     vendor = fields.get("vendor")
     if not vendor or str(vendor).strip() == "" or str(vendor).strip().lower() in ["unknown", "n/a", "none"]:
         return {
             "rule_id": "RULE_VENDOR_DETAILS",
+            "display_name": display_name,
+            "status": STATUS_WARNING,
             "passed": False,
             "severity": "WARNING",
             "message": "Vendor identification is missing or indeterminate.",
@@ -351,6 +604,8 @@ def verify_vendor_details(fields: Dict[str, Any]) -> Dict[str, Any]:
 
     return {
         "rule_id": "RULE_VENDOR_DETAILS",
+        "display_name": display_name,
+        "status": STATUS_PASSED,
         "passed": True,
         "severity": "INFO",
         "message": f"Vendor identified: '{vendor}'.",
@@ -365,6 +620,7 @@ def verify_vendor_details(fields: Dict[str, Any]) -> Dict[str, Any]:
 
 def verify_required_fields(fields: Dict[str, Any]) -> Tuple[Dict[str, Any], List[str]]:
     """Verify mandatory fields are present (invoiceNumber, date, vendor, total)."""
+    display_name = RULE_METADATA["RULE_REQUIRED_FIELDS"]["display_name"]
     required = ["invoiceNumber", "date", "vendor", "total"]
     missing: List[str] = []
 
@@ -376,6 +632,8 @@ def verify_required_fields(fields: Dict[str, Any]) -> Tuple[Dict[str, Any], List
     if missing:
         return {
             "rule_id": "RULE_REQUIRED_FIELDS",
+            "display_name": display_name,
+            "status": STATUS_WARNING,
             "passed": False,
             "severity": "WARNING",
             "message": f"Missing {len(missing)} required invoice field(s): {', '.join(missing)}.",
@@ -385,6 +643,8 @@ def verify_required_fields(fields: Dict[str, Any]) -> Tuple[Dict[str, Any], List
 
     return {
         "rule_id": "RULE_REQUIRED_FIELDS",
+        "display_name": display_name,
+        "status": STATUS_PASSED,
         "passed": True,
         "severity": "INFO",
         "message": "All required invoice fields are present.",
@@ -399,9 +659,12 @@ def verify_required_fields(fields: Dict[str, Any]) -> Tuple[Dict[str, Any], List
 
 def verify_date_sanity(date_str: Optional[str]) -> Dict[str, Any]:
     """Verify date is valid, not future-dated, and not older than MAX_AGE_YEARS."""
+    display_name = RULE_METADATA["RULE_DATE_SANITY"]["display_name"]
     if not date_str:
         return {
             "rule_id": "RULE_DATE_SANITY",
+            "display_name": display_name,
+            "status": STATUS_WARNING,
             "passed": False,
             "severity": "WARNING",
             "message": "Invoice date is missing.",
@@ -414,6 +677,8 @@ def verify_date_sanity(date_str: Optional[str]) -> Dict[str, Any]:
     except ValueError:
         return {
             "rule_id": "RULE_DATE_SANITY",
+            "display_name": display_name,
+            "status": STATUS_FAILED,
             "passed": False,
             "severity": "CRITICAL",
             "message": f"Invoice date '{date_str}' is not in valid ISO format (YYYY-MM-DD).",
@@ -423,10 +688,11 @@ def verify_date_sanity(date_str: Optional[str]) -> Dict[str, Any]:
 
     now = datetime.now(timezone.utc).date()
 
-    # Check future date
     if dt > now:
         return {
             "rule_id": "RULE_DATE_SANITY",
+            "display_name": display_name,
+            "status": STATUS_FAILED,
             "passed": False,
             "severity": "CRITICAL",
             "message": f"Invoice date '{dt}' is in the future (today is {now}).",
@@ -434,11 +700,12 @@ def verify_date_sanity(date_str: Optional[str]) -> Dict[str, Any]:
             "actual": str(dt),
         }
 
-    # Check implausibly old date
     years_old = (now - dt).days / 365.25
     if years_old > MAX_AGE_YEARS:
         return {
             "rule_id": "RULE_DATE_SANITY",
+            "display_name": display_name,
+            "status": STATUS_WARNING,
             "passed": False,
             "severity": "WARNING",
             "message": f"Invoice date '{dt}' is {years_old:.1f} years old (exceeds {MAX_AGE_YEARS} year limit).",
@@ -448,6 +715,8 @@ def verify_date_sanity(date_str: Optional[str]) -> Dict[str, Any]:
 
     return {
         "rule_id": "RULE_DATE_SANITY",
+        "display_name": display_name,
+        "status": STATUS_PASSED,
         "passed": True,
         "severity": "INFO",
         "message": f"Invoice date '{dt}' is valid and sane.",
@@ -464,14 +733,14 @@ def verify_numeric_outlier(
     current_total: Optional[Union[Decimal, float, str]],
     historical_totals: List[Union[Decimal, float, str]],
 ) -> Dict[str, Any]:
-    """Check if total amount is a statistical outlier compared to user history.
-    
-    If fewer than MIN_HISTORY_FOR_OUTLIERS documents exist, marks rule 'not enough data'.
-    """
+    """Check if total amount is a statistical outlier compared to user history."""
+    display_name = RULE_METADATA["RULE_NUMERIC_OUTLIER"]["display_name"]
     dec_current = to_decimal(current_total)
     if dec_current is None:
         return {
             "rule_id": "RULE_NUMERIC_OUTLIER",
+            "display_name": display_name,
+            "status": STATUS_NOT_CHECKED,
             "passed": True,
             "severity": "INFO",
             "message": "Current document total is missing; outlier check skipped.",
@@ -479,7 +748,6 @@ def verify_numeric_outlier(
             "actual": None,
         }
 
-    # Clean historical amounts
     valid_history: List[float] = []
     for h in historical_totals:
         dec_h = to_decimal(h)
@@ -489,11 +757,13 @@ def verify_numeric_outlier(
     if len(valid_history) < MIN_HISTORY_FOR_OUTLIERS:
         return {
             "rule_id": "RULE_NUMERIC_OUTLIER",
+            "display_name": display_name,
+            "status": STATUS_NOT_CHECKED,
             "passed": True,
             "severity": "INFO",
             "message": (
-                f"Not enough data: user has {len(valid_history)} prior documents "
-                f"(requires >= {MIN_HISTORY_FOR_OUTLIERS} for outlier detection)."
+                f"Not enough data: Historical baseline requires >= {MIN_HISTORY_FOR_OUTLIERS} prior documents "
+                f"(found {len(valid_history)}). Outlier check skipped."
             ),
             "expected": f">= {MIN_HISTORY_FOR_OUTLIERS} prior docs",
             "actual": len(valid_history),
@@ -512,11 +782,13 @@ def verify_numeric_outlier(
     if z_score > OUTLIER_Z_THRESHOLD:
         return {
             "rule_id": "RULE_NUMERIC_OUTLIER",
+            "display_name": display_name,
+            "status": STATUS_WARNING,
             "passed": False,
             "severity": "WARNING",
             "message": (
-                f"Total amount ({dec_current}) deviates significantly from user history "
-                f"(median: {median:.2f}, robust z-score: {z_score:.2f} > threshold {OUTLIER_Z_THRESHOLD})."
+                f"Total amount ({dec_current:,.2f}) deviates significantly from user history "
+                f"(median: {median:,.2f}, robust z-score: {z_score:.2f} > threshold {OUTLIER_Z_THRESHOLD})."
             ),
             "expected": f"z-score <= {OUTLIER_Z_THRESHOLD}",
             "actual": round(z_score, 2),
@@ -524,9 +796,11 @@ def verify_numeric_outlier(
 
     return {
         "rule_id": "RULE_NUMERIC_OUTLIER",
+        "display_name": display_name,
+        "status": STATUS_PASSED,
         "passed": True,
         "severity": "INFO",
-        "message": f"Total amount ({dec_current}) is consistent with user history (z-score: {z_score:.2f}).",
+        "message": f"Total amount ({dec_current:,.2f}) is consistent with user history (z-score: {z_score:.2f}).",
         "expected": f"z-score <= {OUTLIER_Z_THRESHOLD}",
         "actual": round(z_score, 2),
     }
