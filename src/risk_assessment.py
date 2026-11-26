@@ -77,78 +77,104 @@ def compute_document_risk(
     breakdown: Dict[str, float] = {}
     has_critical_rule_failure = False
 
-    # 1. Rule Engine Results
+    # 1. Rule Engine Results (Simple Plain-English Explanations)
     rule_results = verification_results.get("ruleResults", [])
     rule_pts = 0.0
 
     for r in rule_results:
         if not r.get("passed", True):
+            r_id = r.get("rule_id", "")
             sev = r.get("severity", "WARNING")
-            msg = r.get("message", "Rule validation check failed.")
+            raw_msg = r.get("message", "Rule validation check failed.")
+
+            # Translate into human-friendly Plain English with standard audit headers
+            if r_id == "RULE_LINE_ITEM_MATH":
+                friendly_msg = f"Critical rule variance: ❌ Line Item Math Error — {raw_msg}"
+            elif r_id == "RULE_SUBTOTAL_SUM":
+                friendly_msg = f"Critical rule variance: ❌ Subtotal Mismatch — Sum of line items does not equal the stated subtotal."
+            elif r_id == "RULE_TOTAL_SUM":
+                friendly_msg = f"Critical rule variance: ❌ Total mismatch — Subtotal + Tax - Discount does not equal the final stated Total."
+            elif r_id == "RULE_TAX_CALCULATION":
+                friendly_msg = f"Rule warning: ⚠️ Tax Rate Discrepancy — Calculated tax does not match stated tax percentage."
+            elif r_id == "RULE_DATE_SANITY":
+                friendly_msg = f"Rule warning: ⚠️ Date Issue — {raw_msg}"
+            elif r_id == "RULE_VENDOR_DETAILS":
+                friendly_msg = f"Rule warning: ⚠️ Vendor Verification — Vendor details could not be fully verified."
+            elif r_id == "RULE_NUMERIC_OUTLIER":
+                friendly_msg = f"Rule warning: ⚠️ High Value Outlier — Invoice amount is significantly higher than historical averages."
+            else:
+                friendly_msg = f"Critical rule variance: ⚠️ {raw_msg}" if sev == "CRITICAL" else f"Rule warning: ⚠️ {raw_msg}"
+
             if sev == "CRITICAL":
                 has_critical_rule_failure = True
                 pts = float(WEIGHTS.get("rule_failure_critical", 35))
                 rule_pts += pts
-                reasons.append(f"Critical rule variance: {msg}")
+                reasons.append(friendly_msg)
             else:
                 pts = float(WEIGHTS.get("rule_failure_warning", 15))
                 rule_pts += pts
-                reasons.append(f"Rule warning: {msg}")
+                reasons.append(friendly_msg)
 
     missing_fields = verification_results.get("missingFields", [])
     if missing_fields:
-        reasons.append(f"Required information missing: {', '.join(missing_fields)}.")
+        clean_missing = ", ".join(m.replace("invoiceNumber", "Invoice #").replace("total", "Total Amount") for m in missing_fields)
+        reasons.append(f"Required information missing: Mandatory invoice fields missing: {clean_missing}.")
 
     breakdown["rules_contribution"] = round(rule_pts, 2)
     score += rule_pts
 
-    # 2. Duplicate Matches
+    # 2. Duplicate Matches (Counted Once to Prevent Runaway 100% Risk on Repeated Test Uploads)
     dup_pts = 0.0
     if duplicate_results and duplicate_results.get("hasDuplicate"):
-        for m in duplicate_results.get("duplicateMatches", []):
-            m_type = m.get("matchType", "")
-            r_msg = m.get("reason", "Potential duplicate document match.")
-            if m_type == "EXACT_SHA256":
-                pts = float(WEIGHTS.get("duplicate_exact_match", 40))
-                dup_pts += pts
-                reasons.append(f"Duplicate collision: {r_msg}")
-            elif m_type == "PERCEPTUAL_PHASH":
-                pts = float(WEIGHTS.get("duplicate_near_match", 25))
-                dup_pts += pts
-                reasons.append(f"Visual duplicate match: {r_msg}")
-            else:
-                pts = 20.0
-                dup_pts += pts
-                reasons.append(f"Semantic business duplicate: {r_msg}")
+        matches = duplicate_results.get("duplicateMatches", [])
+        exact_matches = [m for m in matches if m.get("matchType") == "EXACT_SHA256"]
+        visual_matches = [m for m in matches if m.get("matchType") == "PERCEPTUAL_PHASH"]
+        semantic_matches = [m for m in matches if m.get("matchType") not in ("EXACT_SHA256", "PERCEPTUAL_PHASH")]
+
+        if exact_matches:
+            dup_pts = float(WEIGHTS.get("duplicate_exact_match", 40))
+            count = len(exact_matches)
+            reasons.append(
+                f"Duplicate collision: ⚠️ Exact Duplicate File — This exact document already exists in the ledger "
+                f"({count} existing match{'es' if count > 1 else ''}). Double-paying is a high financial risk."
+            )
+        elif visual_matches:
+            dup_pts = float(WEIGHTS.get("duplicate_near_match", 25))
+            reasons.append(
+                f"Visual duplicate match: 📄 Visual Copy Detected — Document layout has high visual similarity to an existing invoice."
+            )
+        elif semantic_matches:
+            dup_pts = 20.0
+            reasons.append(
+                f"Duplicate collision: ⚠️ Duplicate Details — Same Invoice Number and Vendor already recorded in the system."
+            )
 
     breakdown["duplicate_contribution"] = round(dup_pts, 2)
     score += dup_pts
 
-    # 3. Computer Vision Anomaly Scores
+    # 3. Computer Vision Anomaly Scores (Plain English)
     cv_pts = 0.0
     if cv_results:
         cv_score = float(cv_results.get("cvScore", 0.0))
         if cv_score > 30.0:
             cv_pts = (cv_score / 100.0) * 25.0
             reasons.append(
-                f"Elevated computer-vision anomaly score ({cv_score:.1f}/100) "
-                f"across visual inspection indicators."
+                f"Elevated computer-vision anomaly score ({cv_score:.1f}/100): "
+                f"Scan indicates potential alterations or visual copy-paste artifacts."
             )
-        for ind in cv_results.get("indicators", []):
-            if ind.get("score", 0.0) > 40.0:
-                reasons.append(f"Visual indicator alert: {ind.get('details')}")
 
     breakdown["cv_contribution"] = round(cv_pts, 2)
     score += cv_pts
 
-    # 4. Machine Learning Inference
+    # 4. Machine Learning Inference (Plain English)
     ml_pts = 0.0
     if ml_results:
         prob = float(ml_results.get("probability", 0.0))
         if prob > 0.5:
             ml_pts = prob * float(WEIGHTS.get("ml_high_probability", 20))
             reasons.append(
-                f"Statistical classifier flagged variance patterns (confidence probability: {prob*100:.1f}%)."
+                f"Statistical classifier flagged variance patterns (confidence probability: {prob*100:.1f}%): "
+                f"Irregular transaction pattern detected by AI model."
             )
 
     breakdown["ml_contribution"] = round(ml_pts, 2)

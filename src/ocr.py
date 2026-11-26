@@ -594,8 +594,10 @@ def extract_invoice_fields(
                 inv.field_confidence["tax"] = inv.field_confidence["total"]
 
         # Standalone Total
-        if inv.total is None and any(k in low_txt for k in ["total amount", "total", "gross worth", "amount due", "balance"]):
-            if "subtotal" not in low_txt and "vat" not in low_txt and "tax" not in low_txt:
+        if inv.total is None and any(k in low_txt for k in ["grand total", "total amount", "invoice total", "total", "gross worth", "amount due", "balance"]):
+            # Do not skip if it says 'total (incl. tax)' - only skip if it is purely a tax line like 'total tax'
+            is_tax_only = bool(re.search(r"\b(tax total|total tax|vat total|total vat|tax amount)\b", low_txt))
+            if not is_tax_only and "subtotal" not in low_txt:
                 amt = re.findall(money_pat, line_txt)
                 if amt:
                     val = parse_decimal_amount(amt[-1])
@@ -654,36 +656,61 @@ def extract_invoice_fields(
             break
 
         if in_items_section:
-            # Check if line contains quantity, unit price, line total
-            # Typical row pattern: '<Description...> <Qty> each <Price> <Total>'
-            num_tokens = re.findall(money_pat, line_txt)
-            if len(num_tokens) >= 2:
-                # First number is often quantity (e.g. 1,00 or 4,00)
-                qty = parse_decimal_amount(num_tokens[0])
-                unit_price = parse_decimal_amount(num_tokens[1]) if len(num_tokens) >= 2 else Decimal(0)
-                
-                # Intelligently find matching line total (net or gross)
-                line_total = None
-                if qty is not None and unit_price is not None:
-                    expected_prod = (qty * unit_price).quantize(Decimal("0.01"))
-                    for cand_tok in num_tokens[2:]:
-                        cand_val = parse_decimal_amount(cand_tok)
-                        if cand_val is not None and abs(cand_val - expected_prod) <= Decimal("0.05"):
-                            line_total = cand_val
-                            break
-                if line_total is None:
-                    line_total = (
-                        parse_decimal_amount(num_tokens[2])
-                        if len(num_tokens) >= 3
-                        else parse_decimal_amount(num_tokens[-1])
-                    )
+            # Multi-token line item extraction with mathematical solver:
+            words_in_line = line_txt.split()
+            tokens = []
+            for idx, w in enumerate(words_in_line):
+                clean_w = re.sub(r"^[^\d]+|[^\d]+$", "", w.replace(",", ""))
+                if clean_w and re.match(r"^\d+(\.\d+)?$", clean_w):
+                    tokens.append((idx, Decimal(clean_w)))
 
-                # Extract description by stripping numbers
-                desc = re.sub(money_pat, "", line_txt)
-                desc = re.sub(r"\b(each|pc|pcs|hours|hrs|items)\b", "", desc, flags=re.IGNORECASE)
-                desc = re.sub(r"^\s*\d+[\.\)]?\s*", "", desc).strip()
+            qty = None
+            unit_price = None
+            line_total = None
+            desc_end_idx = len(words_in_line)
 
-                if qty is not None and line_total is not None and len(desc) >= 3:
+            if len(tokens) >= 3:
+                t_val = tokens[-1][1]
+                p_val = tokens[-2][1]
+                q_val = tokens[-3][1]
+                # Check if last token is product of preceding two: qty * unit_price == line_total
+                if abs((q_val * p_val) - t_val) <= Decimal("0.05"):
+                    qty = q_val
+                    unit_price = p_val
+                    line_total = t_val
+                    desc_end_idx = tokens[-3][0]
+                elif abs((p_val * q_val) - t_val) <= Decimal("0.05"):
+                    qty = p_val
+                    unit_price = q_val
+                    line_total = t_val
+                    desc_end_idx = tokens[-3][0]
+                else:
+                    qty = q_val
+                    unit_price = p_val
+                    line_total = t_val
+                    desc_end_idx = tokens[-3][0]
+            elif len(tokens) == 2:
+                val1 = tokens[0][1]
+                val2 = tokens[1][1]
+                if val1 == val2:
+                    qty = Decimal("1.0")
+                    unit_price = val1
+                    line_total = val2
+                elif val1 <= Decimal("50"):
+                    qty = val1
+                    line_total = val2
+                    unit_price = (val2 / val1).quantize(Decimal("0.01"))
+                else:
+                    qty = Decimal("1.0")
+                    unit_price = val1
+                    line_total = val2
+                desc_end_idx = tokens[0][0]
+
+            if qty is not None and line_total is not None:
+                desc = " ".join(words_in_line[:desc_end_idx])
+                desc = re.sub(r"[$€£₹]|USD|EUR|INR|CAD|AUD", "", desc)
+                desc = re.sub(r"\b(each|pc|pcs|hours|hrs|items)\b", "", desc, flags=re.IGNORECASE).strip()
+                if len(desc) >= 2:
                     inv.line_items.append(
                         LineItem(
                             description=desc,

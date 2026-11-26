@@ -136,9 +136,10 @@ def render_analytics(user: Dict[str, Any]):
             {"Risk Factor": "Computer Vision Anomalies", "Weighted Points": factor_weights["cv"]},
             {"Risk Factor": "ML Statistical Variance", "Weighted Points": factor_weights["ml"]},
         ])
-        if df_factors["Weighted Points"].sum() > 0:
+        df_factors_nonzero = df_factors[df_factors["Weighted Points"] > 0]
+        if not df_factors_nonzero.empty:
             fig_factors = px.pie(
-                df_factors,
+                df_factors_nonzero,
                 names="Risk Factor",
                 values="Weighted Points",
                 color="Risk Factor",
@@ -148,15 +149,23 @@ def render_analytics(user: Dict[str, Any]):
                     "Computer Vision Anomalies": "#0071E3",
                     "ML Statistical Variance": "#AF52DE",
                 },
-                hole=0.55,
+                hole=0.58,
+            )
+            fig_factors.update_traces(
+                textposition="inside",
+                textinfo="percent",
+                hoverinfo="label+value+percent",
+                marker=dict(line=dict(color="#FFFFFF", width=2)),
             )
             fig_factors.update_layout(
                 template="plotly_white",
-                margin=dict(t=10, b=10, l=10, r=10),
+                margin=dict(t=15, b=25, l=10, r=10),
                 height=300,
                 paper_bgcolor="rgba(0,0,0,0)",
                 plot_bgcolor="rgba(0,0,0,0)",
                 font=dict(color="#1D1D1F", family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', Inter, sans-serif"),
+                showlegend=True,
+                legend=dict(orientation="h", yanchor="top", y=-0.12, xanchor="center", x=0.5),
             )
             st.plotly_chart(fig_factors, use_container_width=True)
         else:

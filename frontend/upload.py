@@ -349,7 +349,7 @@ def render_batch_hub(batch_files: List[Dict[str, Any]], user: Dict[str, Any], ex
             with item_col2:
                 if st.button("🔍 Inspect", key=f"btn_inspect_batch_{idx}", use_container_width=True):
                     st.session_state["uploaded_file_cache"] = row["doc_item"]
-                    st.session_state["upload_view_mode_toggle"] = "🔍 Detailed Document Inspector"
+                    st.session_state["_switch_to_inspector"] = True
                     st.rerun()
 
         # Export CSV Button
@@ -592,6 +592,9 @@ def render_upload(user: Dict[str, Any]):
     # Check for Batch Mode vs Single Inspection Mode
     batch_files = st.session_state.get("batch_chunk_files")
     if batch_files and len(batch_files) > 1:
+        if st.session_state.pop("_switch_to_inspector", False):
+            st.session_state["upload_view_mode_toggle"] = "🔍 Detailed Document Inspector"
+
         view_mode = st.radio(
             "Workspace View Mode",
             ["📦 Batch Chunk Ingestion Hub", "🔍 Detailed Document Inspector"],

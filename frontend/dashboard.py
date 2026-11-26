@@ -1,5 +1,6 @@
 """Executive Overview & Document Portfolio Dashboard for FinVision."""
 
+from datetime import datetime
 from typing import Any, Dict
 import pandas as pd
 import plotly.express as px
@@ -68,9 +69,10 @@ def render_dashboard(user: Dict[str, Any]):
             "High Risk": kpis.get("high_risk_count", 0),
         }
         df_risk = pd.DataFrame([{"Risk Level": k, "Count": v} for k, v in risk_counts.items()])
-        if df_risk["Count"].sum() > 0:
+        df_risk_nonzero = df_risk[df_risk["Count"] > 0]
+        if not df_risk_nonzero.empty:
             fig_pie = px.pie(
-                df_risk,
+                df_risk_nonzero,
                 values="Count",
                 names="Risk Level",
                 color="Risk Level",
@@ -79,17 +81,23 @@ def render_dashboard(user: Dict[str, Any]):
                     "Medium Variance": "#FF9500",
                     "High Risk": "#FF3B30",
                 },
-                hole=0.6,
+                hole=0.62,
                 template="plotly_white",
             )
+            fig_pie.update_traces(
+                textposition="inside",
+                textinfo="percent",
+                hoverinfo="label+value+percent",
+                marker=dict(line=dict(color="#FFFFFF", width=2)),
+            )
             fig_pie.update_layout(
-                margin=dict(t=10, b=10, l=10, r=10),
+                margin=dict(t=15, b=25, l=10, r=10),
                 height=260,
                 paper_bgcolor="rgba(0,0,0,0)",
                 plot_bgcolor="rgba(0,0,0,0)",
                 font=dict(color="#1D1D1F", family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', Inter, sans-serif"),
                 showlegend=True,
-                legend=dict(orientation="h", yanchor="bottom", y=-0.2, xanchor="center", x=0.5),
+                legend=dict(orientation="h", yanchor="top", y=-0.12, xanchor="center", x=0.5),
             )
             st.plotly_chart(fig_pie, use_container_width=True)
         else:
@@ -117,7 +125,7 @@ def render_dashboard(user: Dict[str, Any]):
                 template="plotly_white",
             )
             fig_bar.update_layout(
-                margin=dict(t=10, b=10, l=10, r=10),
+                margin=dict(t=15, b=25, l=10, r=10),
                 height=260,
                 paper_bgcolor="rgba(0,0,0,0)",
                 plot_bgcolor="rgba(0,0,0,0)",
@@ -132,7 +140,16 @@ def render_dashboard(user: Dict[str, Any]):
         st.markdown("### Monthly Processing Volume")
         trends = kpis.get("monthly_trends", {})
         if trends:
-            df_trends = pd.DataFrame([{"Month": k, "Invoices": v} for k, v in trends.items()])
+            formatted_trends = []
+            for k, v in trends.items():
+                try:
+                    dt = datetime.strptime(str(k)[:7], "%Y-%m")
+                    m_label = dt.strftime("%b %Y")
+                except Exception:
+                    m_label = str(k)
+                formatted_trends.append({"Month": m_label, "Invoices": v})
+
+            df_trends = pd.DataFrame(formatted_trends)
             fig_trend = px.line(
                 df_trends,
                 x="Month",
@@ -141,8 +158,11 @@ def render_dashboard(user: Dict[str, Any]):
                 color_discrete_sequence=["#0071E3"],
                 template="plotly_white",
             )
+            fig_trend.update_xaxes(type="category", tickangle=0)
+            max_inv = max(df_trends["Invoices"]) if not df_trends.empty else 5
+            fig_trend.update_yaxes(rangemode="tozero", dtick=max(1, int(max_inv / 4) if max_inv > 4 else 1))
             fig_trend.update_layout(
-                margin=dict(t=10, b=10, l=10, r=10),
+                margin=dict(t=15, b=25, l=10, r=10),
                 height=260,
                 paper_bgcolor="rgba(0,0,0,0)",
                 plot_bgcolor="rgba(0,0,0,0)",
@@ -174,7 +194,20 @@ def render_dashboard(user: Dict[str, Any]):
                     "Risk": risk.get("level", "LOW"),
                     "Status": (rev.get("decision") or "unreviewed").title(),
                 })
-            st.dataframe(pd.DataFrame(table_rows), use_container_width=True)
+            st.dataframe(
+                pd.DataFrame(table_rows),
+                use_container_width=True,
+                hide_index=True,
+                height=280,
+                column_config={
+                    "Doc ID": st.column_config.TextColumn("Doc ID", width="small"),
+                    "Invoice #": st.column_config.TextColumn("Invoice #", width="medium"),
+                    "Vendor": st.column_config.TextColumn("Vendor", width="medium"),
+                    "Total": st.column_config.TextColumn("Total", width="small"),
+                    "Risk": st.column_config.TextColumn("Risk Level", width="small"),
+                    "Status": st.column_config.TextColumn("Status", width="small"),
+                },
+            )
         else:
             st.info("No documents in portfolio yet. Upload an invoice to get started.")
 
@@ -191,8 +224,20 @@ def render_dashboard(user: Dict[str, Any]):
                     "Invoice #": fields.get("invoiceNumber", "N/A"),
                     "Vendor": fields.get("vendor", "N/A"),
                     "Score": f"{risk.get('score', 0):.0f}/100",
-                    "Primary Flag": risk.get("reasons", ["Flagged"])[0][:40] + "...",
+                    "Primary Flag": risk.get("reasons", ["Flagged"])[0][:45] + "...",
                 })
-            st.dataframe(pd.DataFrame(susp_rows), use_container_width=True)
+            st.dataframe(
+                pd.DataFrame(susp_rows),
+                use_container_width=True,
+                hide_index=True,
+                height=280,
+                column_config={
+                    "Doc ID": st.column_config.TextColumn("Doc ID", width="small"),
+                    "Invoice #": st.column_config.TextColumn("Invoice #", width="medium"),
+                    "Vendor": st.column_config.TextColumn("Vendor", width="medium"),
+                    "Score": st.column_config.TextColumn("Score", width="small"),
+                    "Primary Flag": st.column_config.TextColumn("Primary Flag", width="large"),
+                },
+            )
         else:
             st.success("✓ No high-risk documents currently flagged for investigation.")
