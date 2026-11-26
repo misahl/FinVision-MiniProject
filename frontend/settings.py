@@ -78,49 +78,41 @@ def render_settings(user: Dict[str, Any]):
             ml_metrics = meta.get("metrics", {}).get("mlModel", {})
             with m1:
                 st.markdown(
-                    f"""
-                    <div class="fin-card" style="background: #FFFFFF; border: 1px solid rgba(0,0,0,0.08); border-radius: 14px; padding: 14px; text-align: center; box-shadow: 0 2px 10px rgba(0,0,0,0.03);">
-                        <div style="font-size: 0.78rem; font-weight: 600; color: #515154;">Model Version</div>
-                        <div style="font-size: 1.3rem; font-weight: 700; color: #0071E3;">{meta.get('version', 'v1.0.0')}</div>
-                        <div style="font-size: 0.72rem; color: #6E6E73;">Random Forest (100 Trees)</div>
-                    </div>
-                    """,
+                    '<div class="fin-card" style="background: #FFFFFF; border: 1px solid rgba(0,0,0,0.08); border-radius: 14px; padding: 14px; text-align: center; box-shadow: 0 2px 10px rgba(0,0,0,0.03);">'
+                    '<div style="font-size: 0.78rem; font-weight: 600; color: #515154;">Model Version</div>'
+                    f'<div style="font-size: 1.3rem; font-weight: 700; color: #0071E3;">{meta.get("version", "v1.0.0")}</div>'
+                    '<div style="font-size: 0.72rem; color: #6E6E73;">Random Forest (100 Trees)</div>'
+                    '</div>',
                     unsafe_allow_html=True,
                 )
             with m2:
                 acc_val = ml_metrics.get("accuracy", 1.0) * 100
                 st.markdown(
-                    f"""
-                    <div class="fin-card" style="background: #FFFFFF; border: 1px solid rgba(0,0,0,0.08); border-radius: 14px; padding: 14px; text-align: center; box-shadow: 0 2px 10px rgba(0,0,0,0.03);">
-                        <div style="font-size: 0.78rem; font-weight: 600; color: #515154;">Test Accuracy</div>
-                        <div style="font-size: 1.3rem; font-weight: 700; color: #248A3D;">{acc_val:.1f}%</div>
-                        <div style="font-size: 0.72rem; color: #6E6E73;">Held-out test split</div>
-                    </div>
-                    """,
+                    '<div class="fin-card" style="background: #FFFFFF; border: 1px solid rgba(0,0,0,0.08); border-radius: 14px; padding: 14px; text-align: center; box-shadow: 0 2px 10px rgba(0,0,0,0.03);">'
+                    '<div style="font-size: 0.78rem; font-weight: 600; color: #515154;">Test Accuracy</div>'
+                    f'<div style="font-size: 1.3rem; font-weight: 700; color: #248A3D;">{acc_val:.1f}%</div>'
+                    '<div style="font-size: 0.72rem; color: #6E6E73;">Held-out test split</div>'
+                    '</div>',
                     unsafe_allow_html=True,
                 )
             with m3:
                 f1_val = ml_metrics.get("f1Score", 1.0)
                 st.markdown(
-                    f"""
-                    <div class="fin-card" style="background: #FFFFFF; border: 1px solid rgba(0,0,0,0.08); border-radius: 14px; padding: 14px; text-align: center; box-shadow: 0 2px 10px rgba(0,0,0,0.03);">
-                        <div style="font-size: 0.78rem; font-weight: 600; color: #515154;">Test F1-Score</div>
-                        <div style="font-size: 1.3rem; font-weight: 700; color: #0071E3;">{f1_val:.2f}</div>
-                        <div style="font-size: 0.72rem; color: #6E6E73;">Harmonic mean (P/R)</div>
-                    </div>
-                    """,
+                    '<div class="fin-card" style="background: #FFFFFF; border: 1px solid rgba(0,0,0,0.08); border-radius: 14px; padding: 14px; text-align: center; box-shadow: 0 2px 10px rgba(0,0,0,0.03);">'
+                    '<div style="font-size: 0.78rem; font-weight: 600; color: #515154;">Test F1-Score</div>'
+                    f'<div style="font-size: 1.3rem; font-weight: 700; color: #0071E3;">{f1_val:.2f}</div>'
+                    '<div style="font-size: 0.72rem; color: #6E6E73;">Harmonic mean (P/R)</div>'
+                    '</div>',
                     unsafe_allow_html=True,
                 )
             with m4:
                 samples_str = f"{meta.get('trainSamples', 0)} / {meta.get('testSamples', 0)}"
                 st.markdown(
-                    f"""
-                    <div class="fin-card" style="background: #FFFFFF; border: 1px solid rgba(0,0,0,0.08); border-radius: 14px; padding: 14px; text-align: center; box-shadow: 0 2px 10px rgba(0,0,0,0.03);">
-                        <div style="font-size: 0.78rem; font-weight: 600; color: #515154;">Train / Test Split</div>
-                        <div style="font-size: 1.3rem; font-weight: 700; color: #1D1D1F;">{samples_str}</div>
-                        <div style="font-size: 0.72rem; color: #6E6E73;">GroupShuffleSplit (0 Leakage)</div>
-                    </div>
-                    """,
+                    '<div class="fin-card" style="background: #FFFFFF; border: 1px solid rgba(0,0,0,0.08); border-radius: 14px; padding: 14px; text-align: center; box-shadow: 0 2px 10px rgba(0,0,0,0.03);">'
+                    '<div style="font-size: 0.78rem; font-weight: 600; color: #515154;">Train / Test Split</div>'
+                    f'<div style="font-size: 1.3rem; font-weight: 700; color: #1D1D1F;">{samples_str}</div>'
+                    '<div style="font-size: 0.72rem; color: #6E6E73;">GroupShuffleSplit (0 Leakage)</div>'
+                    '</div>',
                     unsafe_allow_html=True,
                 )
 

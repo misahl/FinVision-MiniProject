@@ -89,6 +89,22 @@ def run_pipeline_on_bytes(
     line_items = edited_line_items if edited_line_items is not None else extracted_dict["lineItems"]
     confidences = extracted_dict["fieldConfidence"]
 
+    # 3.5 Check Document Validity (Is it an invoice or a random photo?)
+    is_valid_inv, validity_reason = ocr.validate_is_invoice_document(raw_text, len(words), fields)
+    if not is_valid_inv:
+        return {
+            "isValidInvoice": False,
+            "rejectionReason": validity_reason,
+            "filename": filename,
+            "file_bytes": file_bytes,
+            "mime_type": mime_type,
+            "preview_image": deskewed_bgr,
+            "fields": fields,
+            "lineItems": line_items,
+            "docId": None,
+            "folder": folder,
+        }
+
     # 4. Deterministic Financial Validation
     verif_results = verification.run_verification_rules(fields, line_items)
 
@@ -246,6 +262,26 @@ def render_batch_hub(batch_files: List[Dict[str, Any]], user: Dict[str, Any], ex
                 )
                 math_rules = [r for r in res["verif"].get("ruleResults", []) if "MATH" in r.get("rule_id", "") or "TOTAL" in r.get("rule_id", "")]
                 math_ok = all(r.get("passed", True) for r in math_rules) if math_rules else True
+                # If image is not a valid invoice (e.g. selfie, photo of object), reject safely
+                if res.get("isValidInvoice") is False:
+                    batch_results.append({
+                        "status": "rejected",
+                        "filename": doc_item["name"],
+                        "vendor": "Not an Invoice",
+                        "invoice_no": "N/A",
+                        "date": "N/A",
+                        "total": 0.0,
+                        "currency": "USD",
+                        "math_pass": False,
+                        "is_dup": False,
+                        "risk_score": 0.0,
+                        "risk_level": "REJECTED",
+                        "docId": "N/A",
+                        "error": res.get("rejectionReason", "Image does not have invoice structure"),
+                        "doc_item": doc_item,
+                    })
+                    continue
+
                 batch_results.append({
                     "status": "success",
                     "filename": doc_item["name"],
@@ -531,7 +567,7 @@ def render_upload(user: Dict[str, Any]):
             """
             <script>
             (function() {
-                // 1. Force Rear Camera in getUserMedia across window and parent
+                // 1. Cleanly Force Rear Camera across window, parent, and top navigation contexts
                 function patchMedia(navObj) {
                     if (!navObj || !navObj.mediaDevices || !navObj.mediaDevices.getUserMedia) return;
                     if (navObj.__finvision_rear_enforced) return;
@@ -553,44 +589,22 @@ def render_upload(user: Dict[str, Any]):
                 try { if (window.parent) patchMedia(window.parent.navigator); } catch(e) {}
                 try { if (window.top) patchMedia(window.top.navigator); } catch(e) {}
 
-                // 2. Active Watcher: If Streamlit starts with front/selfie camera, immediately auto-flip to rear!
-                let checks = 0;
-                const flipTimer = setInterval(function() {
-                    checks++;
-                    if (checks > 60) { clearInterval(flipTimer); return; }
+                // 2. Continuous inline configuration for iOS Safari WebKit (prevent black/frozen frames)
+                function ensureInlinePlay() {
                     try {
                         const pDoc = window.parent ? window.parent.document : document;
-                        const camInput = pDoc.querySelector('div[data-testid="stCameraInput"]');
-                        if (!camInput) return;
-
-                        const video = camInput.querySelector('video');
-                        if (video && video.srcObject) {
-                            const stream = video.srcObject;
-                            const tracks = stream.getVideoTracks();
-                            if (tracks.length > 0) {
-                                const track = tracks[0];
-                                const settings = track.getSettings ? track.getSettings() : {};
-                                const lbl = (track.label || "").toLowerCase();
-                                const isFront = settings.facingMode === 'user' ||
-                                                lbl.includes('front') ||
-                                                lbl.includes('user') ||
-                                                lbl.includes('selfie') ||
-                                                lbl.includes('facetime');
-
-                                if (isFront) {
-                                    // Locate Streamlit's switch camera button and click it to flip to rear camera!
-                                    const switchBtn = camInput.querySelector('button[aria-label*="switch" i], button[aria-label*="flip" i], button[title*="switch" i], div:first-child button');
-                                    if (switchBtn) {
-                                        switchBtn.click();
-                                        clearInterval(flipTimer);
-                                    }
-                                } else if (settings.facingMode === 'environment' || lbl.includes('back') || lbl.includes('rear') || lbl.includes('environment')) {
-                                    clearInterval(flipTimer);
-                                }
+                        const vids = pDoc.querySelectorAll('video');
+                        vids.forEach(function(v) {
+                            if (!v.getAttribute('playsinline')) v.setAttribute('playsinline', 'true');
+                            if (!v.getAttribute('webkit-playsinline')) v.setAttribute('webkit-playsinline', 'true');
+                            v.muted = true;
+                            if (v.paused && v.srcObject) {
+                                v.play().catch(function(){});
                             }
-                        }
-                    } catch(err) {}
-                }, 200);
+                        });
+                    } catch(e) {}
+                }
+                setInterval(ensureInlinePlay, 400);
             })();
             </script>
             """,
@@ -605,7 +619,7 @@ def render_upload(user: Dict[str, Any]):
                         <span>📷 Full-Screen Rear Camera Scanner</span>
                     </div>
                     <div style="font-size: 0.82rem; color: #515154; margin-top: 2px;">
-                        Position paper invoice flat inside the large viewfinder. Tap <b>Take Photo</b> to verify instantly.
+                        Position paper invoice flat inside the viewfinder frame. Tap <b>Take Photo</b> to verify instantly.
                     </div>
                 </div>
                 <div style="background: rgba(36, 138, 61, 0.12); color: #166534; font-size: 0.74rem; font-weight: 700; padding: 5px 14px; border-radius: 980px; border: 1px solid rgba(36, 138, 61, 0.3); display: flex; align-items: center; gap: 6px;">
@@ -728,6 +742,38 @@ def render_upload(user: Dict[str, Any]):
     line_items_init = ext_pack["extracted"]["lineItems"]
     confidences = ext_pack["extracted"]["fieldConfidence"]
     overall_conf = ext_pack["overall_conf"]
+
+    # 4.5 Document Validity Check (Prevent non-invoice images, selfies, walls, objects from entering verification)
+    is_valid_inv, validity_reason = ocr.validate_is_invoice_document(
+        ext_pack.get("raw_text", ""), len(words), raw_fields
+    )
+    if not is_valid_inv:
+        st.markdown(
+            """
+            <div style="background: #FFF1F2; border: 2px solid #F43F5E; border-radius: 20px; padding: 32px 24px; margin: 24px 0; text-align: center; box-shadow: 0 4px 24px rgba(244, 63, 94, 0.12);">
+                <div style="font-size: 2.8rem; margin-bottom: 12px;">📑 ❌</div>
+                <div style="font-weight: 800; font-size: 1.35rem; color: #9F1239; margin-bottom: 8px; letter-spacing: -0.02em;">Invalid Document: Image is Not an Invoice</div>
+                <div style="font-size: 0.95rem; color: #881337; max-width: 520px; margin: 0 auto 24px auto; line-height: 1.55;">
+                    The captured picture does not contain recognizable invoice text, vendor billing headers, line items, or monetary totals (detected photo of non-document). Please take a clear photo of a valid invoice, bill, or receipt.
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        col_retake1, col_retake2 = st.columns([1, 1])
+        with col_retake1:
+            if st.button("📸 Retake Photo with Rear Camera", type="primary", use_container_width=True):
+                st.session_state.pop("uploaded_file_cache", None)
+                st.session_state.pop("active_sample_file", None)
+                st.session_state.pop(cache_key, None)
+                st.rerun()
+        with col_retake2:
+            if st.button("📁 Upload Another Document", use_container_width=True):
+                st.session_state.pop("uploaded_file_cache", None)
+                st.session_state.pop("active_sample_file", None)
+                st.session_state.pop(cache_key, None)
+                st.rerun()
+        return
 
     # 5. Main Split View Above The Fold
     col_preview, col_editor = st.columns([1.05, 1.25])
@@ -1065,7 +1111,10 @@ def render_upload(user: Dict[str, Any]):
                         edited_fields=live_fields,
                         edited_line_items=edited_line_df.to_dict(orient="records"),
                     )
-                    st.session_state["selected_doc_id"] = res["docId"]
-                    st.session_state["nav_page"] = "Verification Results"
-                    st.success(f"✓ Document verified and persisted as {res['docId'][:12]}!")
-                    st.rerun()
+                    if res.get("isValidInvoice") is False:
+                        st.error(res.get("rejectionReason", "⚠️ Image is not a valid invoice or receipt."))
+                    else:
+                        st.session_state["selected_doc_id"] = res["docId"]
+                        st.session_state["nav_page"] = "Verification Results"
+                        st.success(f"✓ Document verified and persisted as {res['docId'][:12]}!")
+                        st.rerun()

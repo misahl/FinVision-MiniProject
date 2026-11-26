@@ -845,3 +845,52 @@ def evaluate_extraction_accuracy(
     results["samples_evaluated"] = len(sample_df)
 
     return results
+
+
+# -------------------------------------------------------------------------
+# Document Validity Verification (Distinguish Invoices from Random Photos)
+# -------------------------------------------------------------------------
+
+INVOICE_INDICATOR_KEYWORDS = [
+    "invoice", "bill to", "billed to", "receipt", "tax invoice", "total",
+    "subtotal", "amount due", "balance due", "due date", "remit", "vat", "gst",
+    "qty", "quantity", "unit price", "line total", "description", "vendor",
+    "payment", "order no", "purchase order", "charges", "statement", "net amount",
+    "gross amount", "currency", "terms", "payable", "discount"
+]
+
+
+def validate_is_invoice_document(
+    raw_text: str,
+    words_count: int,
+    fields: Dict[str, Any],
+) -> Tuple[bool, str]:
+    """Validate whether an uploaded or photographed image is actually an invoice or receipt.
+    
+    Prevents random photos (selfies, blank walls, objects, scenery) from entering
+    the verification pipeline and generating false 100% risk scores.
+    """
+    text_lower = (raw_text or "").lower()
+    matches = [kw for kw in INVOICE_INDICATOR_KEYWORDS if kw in text_lower]
+
+    tot = fields.get("total")
+    has_total = tot is not None and float(tot or 0.0) > 0.0
+    has_subtotal = fields.get("subtotal") is not None and float(fields.get("subtotal") or 0.0) > 0.0
+    has_inv_num = bool(fields.get("invoiceNumber"))
+    has_vendor = bool(fields.get("vendor"))
+
+    # If practically no text was found (e.g. photo of face, wall, room):
+    if words_count < 4 or len(text_lower.strip()) < 15:
+        return (
+            False,
+            "⚠️ Image is not a valid invoice or receipt. No invoice structure, billing details, or financial text were detected. Please take a photo of a valid invoice.",
+        )
+
+    # If no financial keywords AND no financial numbers/identifiers:
+    if len(matches) < 2 and not (has_total or has_subtotal) and not (has_inv_num and has_vendor):
+        return (
+            False,
+            "⚠️ Image is not a valid invoice or receipt. No invoice structure, billing details, or financial totals were detected. Please take a photo of a valid invoice.",
+        )
+
+    return True, "Valid invoice structure detected."
