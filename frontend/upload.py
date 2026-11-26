@@ -531,29 +531,66 @@ def render_upload(user: Dict[str, Any]):
             """
             <script>
             (function() {
-                function enforceRearCamera(targetNav) {
-                    if (!targetNav || !targetNav.mediaDevices || !targetNav.mediaDevices.getUserMedia) return;
-                    if (targetNav.__finvision_camera_patched) return;
-                    targetNav.__finvision_camera_patched = true;
-                    const origGetUserMedia = targetNav.mediaDevices.getUserMedia.bind(targetNav.mediaDevices);
-                    targetNav.mediaDevices.getUserMedia = function(constraints) {
+                // 1. Force Rear Camera in getUserMedia across window and parent
+                function patchMedia(navObj) {
+                    if (!navObj || !navObj.mediaDevices || !navObj.mediaDevices.getUserMedia) return;
+                    if (navObj.__finvision_rear_enforced) return;
+                    navObj.__finvision_rear_enforced = true;
+                    const origGetUserMedia = navObj.mediaDevices.getUserMedia.bind(navObj.mediaDevices);
+                    navObj.mediaDevices.getUserMedia = function(c) {
                         try {
-                            if (constraints) {
-                                if (!constraints.video) {
-                                    constraints.video = { facingMode: { ideal: "environment" } };
-                                } else if (typeof constraints.video === 'object') {
-                                    constraints.video.facingMode = { ideal: "environment" };
-                                } else {
-                                    constraints.video = { facingMode: { ideal: "environment" } };
-                                }
+                            if (!c) c = {};
+                            if (!c.video || typeof c.video !== 'object') {
+                                c.video = { facingMode: { ideal: "environment" } };
+                            } else {
+                                c.video.facingMode = { ideal: "environment" };
                             }
                         } catch(e) {}
-                        return origGetUserMedia(constraints);
+                        return origGetUserMedia(c);
                     };
                 }
-                try { enforceRearCamera(window.navigator); } catch(e) {}
-                try { if (window.parent) enforceRearCamera(window.parent.navigator); } catch(e) {}
-                try { if (window.top) enforceRearCamera(window.top.navigator); } catch(e) {}
+                try { patchMedia(window.navigator); } catch(e) {}
+                try { if (window.parent) patchMedia(window.parent.navigator); } catch(e) {}
+                try { if (window.top) patchMedia(window.top.navigator); } catch(e) {}
+
+                // 2. Active Watcher: If Streamlit starts with front/selfie camera, immediately auto-flip to rear!
+                let checks = 0;
+                const flipTimer = setInterval(function() {
+                    checks++;
+                    if (checks > 60) { clearInterval(flipTimer); return; }
+                    try {
+                        const pDoc = window.parent ? window.parent.document : document;
+                        const camInput = pDoc.querySelector('div[data-testid="stCameraInput"]');
+                        if (!camInput) return;
+
+                        const video = camInput.querySelector('video');
+                        if (video && video.srcObject) {
+                            const stream = video.srcObject;
+                            const tracks = stream.getVideoTracks();
+                            if (tracks.length > 0) {
+                                const track = tracks[0];
+                                const settings = track.getSettings ? track.getSettings() : {};
+                                const lbl = (track.label || "").toLowerCase();
+                                const isFront = settings.facingMode === 'user' ||
+                                                lbl.includes('front') ||
+                                                lbl.includes('user') ||
+                                                lbl.includes('selfie') ||
+                                                lbl.includes('facetime');
+
+                                if (isFront) {
+                                    // Locate Streamlit's switch camera button and click it to flip to rear camera!
+                                    const switchBtn = camInput.querySelector('button[aria-label*="switch" i], button[aria-label*="flip" i], button[title*="switch" i], div:first-child button');
+                                    if (switchBtn) {
+                                        switchBtn.click();
+                                        clearInterval(flipTimer);
+                                    }
+                                } else if (settings.facingMode === 'environment' || lbl.includes('back') || lbl.includes('rear') || lbl.includes('environment')) {
+                                    clearInterval(flipTimer);
+                                }
+                            }
+                        }
+                    } catch(err) {}
+                }, 200);
             })();
             </script>
             """,
@@ -562,20 +599,24 @@ def render_upload(user: Dict[str, Any]):
         )
         st.markdown(
             """
-            <div style="margin: 8px 0 14px 0; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+            <div class="camera-scanner-hud">
                 <div>
-                    <div style="font-weight: 700; font-size: 0.95rem; color: #1D1D1F;">Real-Time Camera Document Scanner</div>
-                    <div style="font-size: 0.82rem; color: #515154;">Position physical paper invoices or receipts flat in front of your camera.</div>
+                    <div style="font-weight: 700; font-size: 1rem; color: #1D1D1F; display: flex; align-items: center; gap: 8px;">
+                        <span>📷 Full-Screen Rear Camera Scanner</span>
+                    </div>
+                    <div style="font-size: 0.82rem; color: #515154; margin-top: 2px;">
+                        Position paper invoice flat inside the large viewfinder. Tap <b>Take Photo</b> to verify instantly.
+                    </div>
                 </div>
-                <div style="background: rgba(36, 138, 61, 0.12); color: #166534; font-size: 0.74rem; font-weight: 700; padding: 4px 12px; border-radius: 980px; border: 1px solid rgba(36, 138, 61, 0.3); display: flex; align-items: center; gap: 6px;">
-                    <span style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #248A3D;"></span>
-                    <span>Rear Camera Active (Environment Mode)</span>
+                <div style="background: rgba(36, 138, 61, 0.12); color: #166534; font-size: 0.74rem; font-weight: 700; padding: 5px 14px; border-radius: 980px; border: 1px solid rgba(36, 138, 61, 0.3); display: flex; align-items: center; gap: 6px;">
+                    <span style="display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #248A3D;"></span>
+                    <span>Rear Camera Active (No Selfie Mode)</span>
                 </div>
             </div>
             """,
             unsafe_allow_html=True,
         )
-        camera_photo = st.camera_input("Capture invoice with back camera", label_visibility="collapsed")
+        camera_photo = st.camera_input("📸 Capture invoice with back camera", label_visibility="collapsed")
         if camera_photo:
             photo_bytes = camera_photo.getvalue()
             photo_name = f"scan_{datetime.now().strftime('%Y%m%d_%H%M%S')}.jpg"
@@ -588,6 +629,28 @@ def render_upload(user: Dict[str, Any]):
             st.session_state.pop("active_sample_file", None)
             st.session_state.pop("batch_chunk_files", None)
             st.success(f"✓ Captured rear camera scan: `{photo_name}` ready for verification.")
+
+        # Native phone camera option with capture="environment" for ultra-high-resolution mobile camera app capture
+        with st.expander("📱 Prefer Your Phone's Native Camera App? (Tap to open full 48MP camera)", expanded=False):
+            st.caption("You can also launch your phone's native camera app directly to use flash, zoom, and hardware auto-focus:")
+            native_cam_file = st.file_uploader(
+                "Upload photo taken with your phone camera",
+                type=["jpg", "jpeg", "png"],
+                key="native_phone_camera_uploader",
+                help="Opens your phone's native rear camera app directly",
+            )
+            if native_cam_file:
+                c_bytes = native_cam_file.getvalue()
+                c_name = native_cam_file.name
+                st.session_state["uploaded_file_cache"] = {
+                    "name": c_name,
+                    "bytes": c_bytes,
+                    "size": len(c_bytes),
+                    "type": native_cam_file.type or "image/jpeg",
+                }
+                st.session_state.pop("active_sample_file", None)
+                st.session_state.pop("batch_chunk_files", None)
+                st.success(f"✓ Document photo loaded: `{c_name}`")
 
     # Check for Batch Mode vs Single Inspection Mode
     batch_files = st.session_state.get("batch_chunk_files")
